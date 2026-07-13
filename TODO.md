@@ -8,7 +8,7 @@
 | phase | status | notes |
 |---|---|---|
 | **0** Skeleton & validation | **PASS** | package + check + kpackagetool install OK (2026-07-13) |
-| **1** Red line (hardcoded) | **READY** | waiting on Grok after Bones phase-1 note |
+| **1** Red line (hardcoded) | **PASS** | implemented 2026-07-13; Grit static QA PASS — Max visual smoke pending |
 | **2** Config schema + UI | pending | |
 | **3** Bind config to QML | pending | |
 | **4** Edge case hardening | pending | |

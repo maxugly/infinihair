@@ -1,6 +1,6 @@
 # Spec: Phase 1 — Hardcoded Red Line
 
-**Status:** READY for Grok (Implementer)  
+**Status:** PASS (implemented 2026-07-13; static QA green — visual smoke for Max)  
 **Owner:** Bones (Architect)  
 **Skill:** `skills/ARTISAN.md`
 
