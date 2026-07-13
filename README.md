@@ -14,7 +14,7 @@ A **zero-latency**, full-screen crosshair overlay for KDE Plasma. Renders precis
 *   **🖥️ Multi-Monitor Ready:** Lines span the virtual desktop (`Workspace.virtualScreenSize`).  
 *   **🎨 Fully Customizable:** Color (picker), thickness, opacity, inch ticks / PPI via System Settings.  
 *   **⌨️ Shortcuts:** **Meta+Shift+X** toggle · **Meta+Shift+V/H** second V/H guides · **Meta+Shift+B** capture border offsets · **Meta+Shift+C** clear guides.  
-*   **📐 Offset guides:** Extra vertical/horizontal lines with independent enable, px offset from cursor, and color (for border alignment while the primary stays on the cursor).  
+*   **📐 Offset guides:** Extra V/H lines (own color + offset). With auto-align (default on), they snap to the nearest window frame edges on hover and **stay sticky while you drag** the window; primary crosshair stays on the cursor.  
 *   **🌍 Global Overlay:** Full-screen transparent window above other surfaces; input-through so clicks pass through.  
 *   **⚡ Lightweight:** Simple `Rectangle` scene-graph primitives.
 
@@ -99,7 +99,7 @@ journalctl --user -u plasma-kwin_x11.service -f
 | **Works after reload.sh, broken after disable/re-enable** | Long session may keep a stale package-path QML body. Run `./scripts/reload.sh` or restart KWin once after upgrades. |
 | **Many Configure windows** | Upstream KWin Scripts KCM (all scripts). Close extras; one gear click. |
 | **Toggle not working** | Default **Meta+Shift+X**. Rebind: System Settings → Keyboard → Shortcuts → search *Infinite Crosshair*. |
-| **Offset lines wrong** | **Meta+Shift+B** with cursor over the window near the edge you care about; **Meta+Shift+O** toggles mode; **Meta+Shift+C** clears. |
+| **Offset guides wrong** | Enable in Configure or **Meta+Shift+V/H**. Set offsets/colors there, or **Meta+Shift+B** over a window near the edge. **Meta+Shift+C** clears. |
 | **Lag or stutter** | Must use native declarative script (this package). No cursor `Timer` polling. Check `journalctl` for QML errors. |
 
 ```bash
