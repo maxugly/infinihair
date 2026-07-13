@@ -14,7 +14,7 @@
 ### A. Architecture
 *   **Language:** QML (QtQuick) for rendering; JavaScript only for lightweight logic if absolutely necessary. **No C++ compilation required** for the core effect.
 *   **API:** Must use `X-Plasma-API: declarativescript` in `metadata.json`.
-*   **Entry Point:** The `contents/ui/Crosshair.qml` file is the single source of truth for rendering.
+*   **Entry Point:** `contents/ui/main.qml` is the KWin `X-Plasma-MainScript` entry. `contents/ui/Crosshair.qml` is the single source of truth for rendering.
 *   **Event Handling:** Must rely exclusively on `workspace.cursorPosChanged` signals. **Polling** (e.g., `Timer` loops to check position) is forbidden.
 
 ### B. Coordinate System

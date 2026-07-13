@@ -1,0 +1,68 @@
+name: CI/CD Pipeline
+
+on: [push, pull_request]
+
+# Project build is distro-agnostic (python3 + scripts/*.sh).
+# This workflow only provisions tools onto the GitHub-hosted runner.
+# Locally on CachyOS/Arch/etc.: install tools with your package manager, then:
+#   ./scripts/check.sh
+#   ./scripts/package.sh
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Ensure python3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Package + structural checks (distro-agnostic)
+        run: |
+          chmod +x scripts/package.sh scripts/check.sh
+          # Package path requires only python3 (no OS package manager).
+          ./scripts/package.sh
+          ls -lh *.kwinscript
+
+      - name: Provision optional runner tools
+        # Runner-specific bootstrap only — not part of the project build API.
+        # Equivalent local tools: shellcheck, kpackagetool6 (any distro package names).
+        run: |
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              shellcheck \
+              libxml2-utils \
+              || true
+            # KPackage tooling package name varies by Ubuntu/Debian release
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y kf6-kpackage \
+              || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y kpackagetool6 \
+              || true
+          elif command -v pacman >/dev/null 2>&1; then
+            sudo pacman -Syu --noconfirm shellcheck libxml2 kpackage \
+              || true
+          elif command -v dnf >/dev/null 2>&1; then
+            sudo dnf install -y ShellCheck libxml2 kf6-kpackage \
+              || true
+          else
+            echo "No known package manager on runner; optional tools may be missing"
+          fi
+
+      - name: Full check (fail if kpackagetool6 present and broken)
+        run: |
+          if command -v kpackagetool6 >/dev/null 2>&1; then
+            CHECK_REQUIRE_KPACKAGE=1 ./scripts/check.sh
+          else
+            echo "WARNING: kpackagetool6 not available on runner; package-only gate"
+            ./scripts/check.sh
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crosshair.kwinscript
+          path: "*.kwinscript"

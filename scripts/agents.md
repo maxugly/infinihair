@@ -12,9 +12,11 @@ You are working in `scripts/`. You create tools to build, reload, and package th
 - `journalctl`: For parsing KWin logs (`QT_CATEGORY=kwin_scripting`).
 
 # Task Guidelines
+- **Distro-agnostic:** Never call `apt`/`pacman`/`dnf` from project scripts. Require tools on `PATH` only (`python3` required; others optional).  
 - **Reload Script:** Must unload, upgrade, and reconfigure KWin without restarting Plasma.  
-- **Packaging:** Must create a valid `.kwinscript` (tar.gz) excluding `.git` and build artifacts.  
-- **Error Handling:** Scripts must exit with non-zero status if `kpackagetool6` fails.
+- **Packaging:** `./scripts/package.sh` must create a valid `.kwinscript` (ZIP) excluding `.git` and build artifacts.  
+- **Checks:** `./scripts/check.sh` runs package + optional shellcheck/kpackagetool6.  
+- **Error Handling:** Scripts must exit with non-zero status on failure.
 
 # Log Patterns
 - Watch for: `"Could not load script"`, `"QML Component Error"`, `"Metadata invalid"`.  

@@ -1,2 +1,4 @@
-*.swp
 *.kwinscript
+*.swp
+.DS_Store
+build/

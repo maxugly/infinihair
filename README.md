@@ -67,10 +67,13 @@ During development, use the provided script to reload changes without restarting
 ```
 
 ### Packaging
-To build a distributable `.kwinscript` file:  
+Distro-agnostic: only **`python3`** on `PATH` (no apt/pacman).  
 ```bash
 ./scripts/package.sh
 # Output: crosshair.kwinscript
+
+# Optional fuller gate (uses shellcheck / kpackagetool6 if installed):
+./scripts/check.sh
 ```
 
 ### Debugging

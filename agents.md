@@ -17,6 +17,7 @@ You are the lead architect for the **KWin Infinite Crosshair** project. Your goa
 - `contents/config/`: **User Interface**. Agents here focus on KConfigXT schemas and Qt Widgets UI for settings.
 - `contents/code/`: **Lifecycle Logic**. Agents here handle initialization and teardown (minimal logic preferred).
 - `scripts/`: **DevOps**. Agents here manage packaging (`kpackagetool6`) and reload workflows.
+- `skills/SENTINEL.md` + `.github/workflows/`: **QA & Automation**. The Sentinel gates installability, lint, and artifacts.
 
 # Global Standards (The Constitution)
 1.  **Signal-Driven:** Never poll `cursorPos`. Use `workspace.cursorPosChanged`.

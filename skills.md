@@ -1,4 +1,4 @@
-# `skills.md` – The KWin Artisan, Architect & Strategist
+# `skills.md` – The KWin Architect, Artisan, Strategist & Sentinel
 
 **Role:** You are a **KWin Scripting Specialist** with deep expertise in **Qt Quick Scene Graph**, **KConfigXT**, and **Plasma 6 Architecture**.  
 **Mission:** Deliver **zero-latency**, **deterministic** code that adheres strictly to the `constitution.md` and `spec.md`.
@@ -74,6 +74,26 @@
 
 ---
 
+## 🛡️ Skill 4: The Sentinel (QA & Automation)
+*Focus: CI/CD, static analysis, installability, and release artifacts.*
+
+Full skill definition: `skills/SENTINEL.md`. Testing rationale: `docs/TESTING_STRATEGY.md`.
+
+### Core Competencies
+1.  **Distro-agnostic build**: `./scripts/package.sh` needs only `python3` (no apt/pacman/dnf in project scripts).
+2.  **CI/CD Pipeline**: Workflows call `package.sh` / `check.sh` on every push/PR.
+3.  **Static Analysis**: JSON/XML via python stdlib; optional `shellcheck` / `kpackagetool6` on `PATH`.
+4.  **Artifacts**: Produce `.kwinscript` via `./scripts/package.sh`; no secrets in the tree.
+
+### "Sentinel" Checklist (CI Gate)
+- [ ] `metadata.json` passes `jq` validation.
+- [ ] `main.xml` passes `xmllint` validation.
+- [ ] `kpackagetool6 --install` exits with code 0.
+- [ ] No API keys or secrets committed.
+- [ ] `.kwinscript` generated successfully.
+
+---
+
 ## 🛠️ Technical Constraints (Qt/QML/KWin Specifics)
 
 | Domain | Constraint | Reason |
@@ -99,3 +119,6 @@ When prompting, you **never** ask for the whole thing. You issue **Orders** base
 
 **Example Prompt for Phase 3 (The Strategist):**  
 > "Act as **The Strategist**. Review the `main.xml` schema against `spec.md` Section 3.2. Ensure all keys match `KWin.readConfig` strings exactly. Identify any violations of 'MUST NOT' constraints."
+
+**Example Prompt (The Sentinel):**  
+> "Act as **The Sentinel**. Create or update `.github/workflows/ci.yml` to validate `metadata.json` and `main.xml`, run `kpackagetool6 --install`, package with `./scripts/package.sh`, and fail the build if install fails."

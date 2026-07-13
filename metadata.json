@@ -15,7 +15,7 @@
         "EnabledByDefault": false
     },
     "X-Plasma-API": "declarativescript",
-    "X-Plasma-MainScript": "ui/Crosshair.qml",
+    "X-Plasma-MainScript": "ui/main.qml",
     "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
     "KPackageStructure": "KWin/Script"
 }
