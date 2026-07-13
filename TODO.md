@@ -34,13 +34,13 @@ Spec: [specs/phase-0-skeleton.md](specs/phase-0-skeleton.md)
 
 Spec: [specs/phase-1-red-line.md](specs/phase-1-red-line.md) *(Bones to flesh if thin)*
 
-- [ ] Implement hardcoded red lines in `contents/ui/Crosshair.qml` (`#FF0000`, 1px, opacity 0.8)
-- [ ] Bind position to `workspace.cursorPos` only (no Timer, no Behavior)
-- [ ] `z: 9999`; span full virtual desktop (`workspace.workspaceWidth` / `workspace.workspaceHeight` or virtual screen size)
-- [ ] Keep `main.qml` as thin entry only
-- [ ] Do **not** add `KWin.readConfig` yet (Phase 3)
-- [ ] Run `./scripts/package.sh` && `./scripts/check.sh`
-- [ ] Hand off to Grit for QA review under `qa/`
+- [x] Implement hardcoded red lines in `contents/ui/Crosshair.qml` (`#FF0000`, 1px, opacity 0.8)
+- [x] Bind position to `workspace.cursorPos` only (no Timer, no Behavior)
+- [x] `z: 9999`; span full virtual desktop (`workspace.workspaceWidth` / `workspace.workspaceHeight` or virtual screen size)
+- [x] Keep `main.qml` as thin entry only
+- [x] Do **not** add `KWin.readConfig` yet (Phase 3)
+- [x] Run `./scripts/package.sh` && `./scripts/check.sh`
+- [x] Hand off to Grit for QA review under `qa/` — see `qa/review-phase1-20260713.md`
 
 ---
 
