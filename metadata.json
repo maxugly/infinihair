@@ -1,0 +1,21 @@
+{
+    "KPlugin": {
+        "Name": "Infinite Crosshair",
+        "Description": "Renders full-screen vertical and horizontal lines following the cursor.",
+        "Icon": "preferences-desktop-display",
+        "Authors": [
+            {
+                "Name": "User",
+                "Email": "user@example.com"
+            }
+        ],
+        "Id": "kwin-crosshair",
+        "Version": "1.0",
+        "License": "GPLv3",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/Crosshair.qml",
+    "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
+    "KPackageStructure": "KWin/Script"
+}
