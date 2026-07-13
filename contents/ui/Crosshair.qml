@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset4"
+    readonly property string buildId: "2026-07-13-offset5"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough

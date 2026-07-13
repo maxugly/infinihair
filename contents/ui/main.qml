@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset4"
+    readonly property string buildId: "2026-07-13-offset5"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -83,80 +83,44 @@ Window {
     // changes without a cursorPos change.
     property int autoAlignRev: 0
 
-    // Live target for automagic edge align. Priority:
-    // 1) window currently in interactive move/resize (KWin move/resize flags)
-    // 2) window from signal hooks (offsetTrackWindow)
-    // 3) window under cursor (hover)
-    // Cursor leave during drag is normal — (1)/(2) keep guides alive.
-    readonly property var autoAlignWindow: {
+    // Sticky guide state: main crosshair is cursor-only so it never drops.
+    // Guides previously vanished mid-drag when hit-testing lost the window.
+    // We keep last good edge coords until move ends and cursor leaves windows.
+    property bool guidesSticky: false
+    property real stickyEdgeX: 0
+    property real stickyEdgeY: 0
+
+    // Drive sync from cursor / stacking / rev (primary still uses cursor only).
+    readonly property int guideSyncToken: {
         void Workspace.cursorPos;
         void Workspace.stackingOrder;
         void root.autoAlignRev;
-        if (!root.autoOffsetOnMove)
-            return null;
-        const moving = root.windowBeingMovedOrResized();
-        if (moving)
-            return moving;
-        if (root.offsetTrackWindow)
-            return root.offsetTrackWindow;
-        return root.windowUnderCursor();
+        root.syncAutoGuides();
+        return root.autoAlignRev
+            + Math.round(Workspace.cursorPos.x)
+            + Math.round(Workspace.cursorPos.y);
     }
 
-    // Nearest frame edges for automagic (manual offset fallback when no window).
-    readonly property real autoEdgeX: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        const w = root.autoAlignWindow;
-        const g = root.liveFrameGeometry(w);
-        if (!g)
-            return root.linePosX + root.offsetVerticalOffset;
-        const pos = Workspace.cursorPos;
-        const left = g.x;
-        const right = g.x + g.width;
-        // While moving/resizing, prefer the edge that was nearer at grab-ish
-        // cursor, but always use live geometry so guides ride the window.
-        return (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
-    }
-
-    readonly property real autoEdgeY: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        const w = root.autoAlignWindow;
-        const g = root.liveFrameGeometry(w);
-        if (!g)
-            return root.linePosY + root.offsetHorizontalOffset;
-        const pos = Workspace.cursorPos;
-        const top = g.y;
-        const bottom = g.y + g.height;
-        return (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
-    }
-
-    // Draw positions for second guides.
+    // Draw positions for second guides (sticky edges while auto is on).
     readonly property real offsetVerticalPosX: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        if (root.autoOffsetOnMove && root.autoAlignWindow)
-            return root.autoEdgeX;
+        void root.guideSyncToken;
+        if (root.autoOffsetOnMove && root.guidesSticky)
+            return root.stickyEdgeX;
         return root.linePosX + root.offsetVerticalOffset;
     }
 
     readonly property real offsetHorizontalPosY: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        if (root.autoOffsetOnMove && root.autoAlignWindow)
-            return root.autoEdgeY;
+        void root.guideSyncToken;
+        if (root.autoOffsetOnMove && root.guidesSticky)
+            return root.stickyEdgeY;
         return root.linePosY + root.offsetHorizontalOffset;
     }
 
-    // Automagic: show guides whenever we have a target window (incl. mid-drag).
+    // Primary always shows when crosshairEnabled. Guides use sticky or manual.
     readonly property bool showOffsetVertical: root.crosshairEnabled && (
-        root.autoOffsetOnMove && root.autoAlignWindow
-            ? true
-            : root.offsetVerticalEnabled)
+        root.autoOffsetOnMove ? root.guidesSticky : root.offsetVerticalEnabled)
     readonly property bool showOffsetHorizontal: root.crosshairEnabled && (
-        root.autoOffsetOnMove && root.autoAlignWindow
-            ? true
-            : root.offsetHorizontalEnabled)
+        root.autoOffsetOnMove ? root.guidesSticky : root.offsetHorizontalEnabled)
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
@@ -873,25 +837,97 @@ Window {
         return null;
     }
 
+    function nearestEdgesFromFrame(g, pos) {
+        if (!g || !pos)
+            return null;
+        const left = g.x;
+        const right = g.x + g.width;
+        const top = g.y;
+        const bottom = g.y + g.height;
+        return {
+            x: (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right,
+            y: (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom
+        };
+    }
+
+    // Resolve which window guides should follow (move flags > hook > under cursor).
+    function resolveGuideWindow() {
+        const moving = root.windowBeingMovedOrResized();
+        if (moving)
+            return moving;
+        if (root.offsetTrackWindow)
+            return root.offsetTrackWindow;
+        return root.windowUnderCursor();
+    }
+
+    // Keep stickyEdge* updated. Called from guideSyncToken (cursor / stacking / rev).
+    // Main crosshair is independent (cursor only) — only secondary guides use this.
+    function syncAutoGuides() {
+        if (!root.autoOffsetOnMove) {
+            root.guidesSticky = false;
+            return;
+        }
+
+        const moving = root.windowBeingMovedOrResized();
+        if (moving)
+            root.offsetTrackWindow = moving;
+
+        // Drop track only when move/resize fully ended.
+        if (root.offsetTrackWindow && !moving) {
+            try {
+                const tw = root.offsetTrackWindow;
+                if (tw.move !== true && tw.resize !== true)
+                    root.offsetTrackWindow = null;
+            } catch (e) {
+                root.offsetTrackWindow = null;
+            }
+        }
+
+        const w = root.resolveGuideWindow();
+        if (!w) {
+            // No target: hide guides (hover left all windows / drag ended).
+            root.guidesSticky = false;
+            return;
+        }
+
+        const g = root.liveFrameGeometry(w);
+        const edges = root.nearestEdgesFromFrame(g, Workspace.cursorPos);
+        if (!edges) {
+            // Keep previous sticky edges if geometry glitched mid-frame.
+            if (root.guidesSticky)
+                return;
+            root.guidesSticky = false;
+            return;
+        }
+
+        root.stickyEdgeX = edges.x;
+        root.stickyEdgeY = edges.y;
+        root.guidesSticky = true;
+
+        // Bake into manual offsets so turning auto off keeps last edges.
+        root.offsetVerticalOffset = Math.round(edges.x - Workspace.cursorPos.x);
+        root.offsetHorizontalOffset = Math.round(edges.y - Workspace.cursorPos.y);
+    }
+
     // Nearest L/R → vertical guide offset; nearest T/B → horizontal guide offset.
     // offset = edge - cursor so (cursor + offset) sits on the edge.
     function setOffsetFromFrame(g, sourceTag) {
         if (!g)
             return false;
         const pos = Workspace.cursorPos;
-        const left = g.x;
-        const right = g.x + g.width;
-        const top = g.y;
-        const bottom = g.y + g.height;
-        const edgeX = (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
-        const edgeY = (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
-        root.offsetVerticalOffset = Math.round(edgeX - pos.x);
-        root.offsetHorizontalOffset = Math.round(edgeY - pos.y);
+        const edges = root.nearestEdgesFromFrame(g, pos);
+        if (!edges)
+            return false;
+        root.offsetVerticalOffset = Math.round(edges.x - pos.x);
+        root.offsetHorizontalOffset = Math.round(edges.y - pos.y);
+        root.stickyEdgeX = edges.x;
+        root.stickyEdgeY = edges.y;
+        root.guidesSticky = true;
         root.offsetVerticalEnabled = true;
         root.offsetHorizontalEnabled = true;
         console.log("InfiniteCrosshair guide offsets",
                     "v=", root.offsetVerticalOffset, "h=", root.offsetHorizontalOffset,
-                    "edge=", Math.round(edgeX) + "," + Math.round(edgeY),
+                    "edge=", Math.round(edges.x) + "," + Math.round(edges.y),
                     "src=", sourceTag || "n/a");
         return true;
     }
@@ -913,6 +949,7 @@ Window {
         root.offsetVerticalOffset = 0;
         root.offsetHorizontalOffset = 0;
         root.offsetTrackWindow = null;
+        root.guidesSticky = false;
         console.log("InfiniteCrosshair offset guides cleared");
     }
 
