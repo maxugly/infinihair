@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset5"
+    readonly property string buildId: "2026-07-13-units1"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -83,80 +83,44 @@ Window {
     // changes without a cursorPos change.
     property int autoAlignRev: 0
 
-    // Live target for automagic edge align. Priority:
-    // 1) window currently in interactive move/resize (KWin move/resize flags)
-    // 2) window from signal hooks (offsetTrackWindow)
-    // 3) window under cursor (hover)
-    // Cursor leave during drag is normal — (1)/(2) keep guides alive.
-    readonly property var autoAlignWindow: {
+    // Sticky guide state: main crosshair is cursor-only so it never drops.
+    // Guides previously vanished mid-drag when hit-testing lost the window.
+    // We keep last good edge coords until move ends and cursor leaves windows.
+    property bool guidesSticky: false
+    property real stickyEdgeX: 0
+    property real stickyEdgeY: 0
+
+    // Drive sync from cursor / stacking / rev (primary still uses cursor only).
+    readonly property int guideSyncToken: {
         void Workspace.cursorPos;
         void Workspace.stackingOrder;
         void root.autoAlignRev;
-        if (!root.autoOffsetOnMove)
-            return null;
-        const moving = root.windowBeingMovedOrResized();
-        if (moving)
-            return moving;
-        if (root.offsetTrackWindow)
-            return root.offsetTrackWindow;
-        return root.windowUnderCursor();
+        root.syncAutoGuides();
+        return root.autoAlignRev
+            + Math.round(Workspace.cursorPos.x)
+            + Math.round(Workspace.cursorPos.y);
     }
 
-    // Nearest frame edges for automagic (manual offset fallback when no window).
-    readonly property real autoEdgeX: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        const w = root.autoAlignWindow;
-        const g = root.liveFrameGeometry(w);
-        if (!g)
-            return root.linePosX + root.offsetVerticalOffset;
-        const pos = Workspace.cursorPos;
-        const left = g.x;
-        const right = g.x + g.width;
-        // While moving/resizing, prefer the edge that was nearer at grab-ish
-        // cursor, but always use live geometry so guides ride the window.
-        return (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
-    }
-
-    readonly property real autoEdgeY: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        const w = root.autoAlignWindow;
-        const g = root.liveFrameGeometry(w);
-        if (!g)
-            return root.linePosY + root.offsetHorizontalOffset;
-        const pos = Workspace.cursorPos;
-        const top = g.y;
-        const bottom = g.y + g.height;
-        return (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
-    }
-
-    // Draw positions for second guides.
+    // Draw positions for second guides (sticky edges while auto is on).
     readonly property real offsetVerticalPosX: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        if (root.autoOffsetOnMove && root.autoAlignWindow)
-            return root.autoEdgeX;
+        void root.guideSyncToken;
+        if (root.autoOffsetOnMove && root.guidesSticky)
+            return root.stickyEdgeX;
         return root.linePosX + root.offsetVerticalOffset;
     }
 
     readonly property real offsetHorizontalPosY: {
-        void Workspace.cursorPos;
-        void root.autoAlignRev;
-        if (root.autoOffsetOnMove && root.autoAlignWindow)
-            return root.autoEdgeY;
+        void root.guideSyncToken;
+        if (root.autoOffsetOnMove && root.guidesSticky)
+            return root.stickyEdgeY;
         return root.linePosY + root.offsetHorizontalOffset;
     }
 
-    // Automagic: show guides whenever we have a target window (incl. mid-drag).
+    // Primary always shows when crosshairEnabled. Guides use sticky or manual.
     readonly property bool showOffsetVertical: root.crosshairEnabled && (
-        root.autoOffsetOnMove && root.autoAlignWindow
-            ? true
-            : root.offsetVerticalEnabled)
+        root.autoOffsetOnMove ? root.guidesSticky : root.offsetVerticalEnabled)
     readonly property bool showOffsetHorizontal: root.crosshairEnabled && (
-        root.autoOffsetOnMove && root.autoAlignWindow
-            ? true
-            : root.offsetHorizontalEnabled)
+        root.autoOffsetOnMove ? root.guidesSticky : root.offsetHorizontalEnabled)
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
@@ -168,9 +132,15 @@ Window {
     property int lineWidth: 1
     property real lineOpacity: 0.8
     property bool showInchTicks: true
+    // 0 = Imperial (inch ticks), 1 = Metric (cm ticks)
+    property int tickUnits: 0
     property real screenDiagonalInches: 27.0
+    // Separate storage — never treat inch value as cm when switching units
+    property real screenDiagonalCm: 68.6
     property int tickLength: 10
     property bool showHalfInchTicks: true
+
+    readonly property bool useMetricTicks: root.tickUnits === 1
 
     // Tick stroke stays 1px — only the infinite lines use LineWidth.
     readonly property int tickStroke: 1
@@ -231,7 +201,9 @@ Window {
         + "print('LineWidth='+kr('LineWidth','1'))\n"
         + "print('Opacity='+kr('Opacity','0.8'))\n"
         + "print('ShowInchTicks='+kr('ShowInchTicks','true'))\n"
+        + "print('TickUnits='+kr('TickUnits','0'))\n"
         + "print('ScreenDiagonalInches='+kr('ScreenDiagonalInches','27.0'))\n"
+        + "print('ScreenDiagonalCm='+kr('ScreenDiagonalCm','68.6'))\n"
         + "print('TickLength='+kr('TickLength','10'))\n"
         + "print('ShowHalfInchTicks='+kr('ShowHalfInchTicks','true'))\n"
         + "print('OffsetVerticalEnabled='+kr('OffsetVerticalEnabled','false'))\n"
@@ -475,6 +447,21 @@ Window {
             root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true),
             sourceTag || "map"
         );
+        if (map.TickUnits !== undefined) {
+            const u = root.parseIntClamped(map.TickUnits, 0, 0, 1);
+            if (tickUnits !== u) {
+                console.log("InfiniteCrosshair TickUnits", tickUnits, "->", u,
+                            u === 1 ? "metric" : "imperial");
+                tickUnits = u;
+            }
+        }
+        if (map.ScreenDiagonalCm !== undefined) {
+            const cm = root.parseRealClamped(map.ScreenDiagonalCm, 68.6, 12.0, 305.0);
+            if (Math.abs(screenDiagonalCm - cm) > 0.0001) {
+                console.log("InfiniteCrosshair ScreenDiagonalCm", screenDiagonalCm, "->", cm);
+                screenDiagonalCm = cm;
+            }
+        }
         if (map.AutoOffsetOnMove !== undefined) {
             const ao = root.parseBool(map.AutoOffsetOnMove, true);
             if (autoOffsetOnMove !== ao) {
@@ -545,8 +532,8 @@ Window {
             "LineColorR": 1, "LineColorG": 1, "LineColorB": 1, "LineColor": 1,
             "OffsetVerticalColorR": 1, "OffsetVerticalColorG": 1, "OffsetVerticalColorB": 1, "OffsetVerticalColor": 1,
             "OffsetHorizontalColorR": 1, "OffsetHorizontalColorG": 1, "OffsetHorizontalColorB": 1, "OffsetHorizontalColor": 1,
-            "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1,
-            "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
+            "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1, "TickUnits": 1,
+            "ScreenDiagonalInches": 1, "ScreenDiagonalCm": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
             "OffsetVerticalEnabled": 1, "OffsetVerticalOffset": 1,
             "OffsetHorizontalEnabled": 1, "OffsetHorizontalOffset": 1,
             "AutoOffsetOnMove": 1
@@ -586,7 +573,9 @@ Window {
         const lw = root.parseIntClamped(KWin.readConfig("LineWidth", 1), 1, 1, 32);
         const op = root.parseRealClamped(KWin.readConfig("Opacity", 0.8), 0.8, 0.05, 1.0);
         const ticks = root.parseBool(KWin.readConfig("ShowInchTicks", true), true);
+        root.tickUnits = root.parseIntClamped(KWin.readConfig("TickUnits", 0), 0, 0, 1);
         const diag = root.parseRealClamped(KWin.readConfig("ScreenDiagonalInches", 27.0), 27.0, 5.0, 120.0);
+        root.screenDiagonalCm = root.parseRealClamped(KWin.readConfig("ScreenDiagonalCm", 68.6), 68.6, 12.0, 305.0);
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
         root.autoOffsetOnMove = root.parseBool(KWin.readConfig("AutoOffsetOnMove", true), true);
@@ -615,7 +604,7 @@ Window {
             root.setOffsetHorizontalColorRgb(hr, hg, hb, "seed");
         }
         console.log("InfiniteCrosshair seed rgb=", r, g, b,
-                    "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen,
+                    "lw=", lw, "op=", op, "ticks=", ticks, "units=", root.tickUnits, "tlen=", tlen,
                     "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,
                     "offH=", root.offsetHorizontalEnabled, root.offsetHorizontalOffset,
                     "autoOffset=", root.autoOffsetOnMove,
@@ -738,7 +727,9 @@ Window {
         return screens[0];
     }
 
-    readonly property real pixelsPerInch: {
+    // Pixels per physical unit for the active TickUnits system.
+    // Imperial: px per inch. Metric: px per centimeter. Diagonals are independent.
+    readonly property real pixelsPerUnit: {
         void Workspace.cursorPos;
         const screen = root.screenUnderCursor();
         let w = Workspace.virtualScreenSize.width;
@@ -747,16 +738,26 @@ Window {
             w = screen.geometry.width;
             h = screen.geometry.height;
         }
-        const diagIn = Math.max(0.1, root.screenDiagonalInches);
         const diagPx = Math.sqrt(w * w + h * h);
+        if (root.useMetricTicks) {
+            const diagCm = Math.max(0.1, root.screenDiagonalCm);
+            return diagPx / diagCm;
+        }
+        const diagIn = Math.max(0.1, root.screenDiagonalInches);
         return diagPx / diagIn;
     }
 
+    // Back-compat alias (logs / older mental model).
+    readonly property real pixelsPerInch: root.useMetricTicks
+        ? (root.pixelsPerUnit * 2.54)
+        : root.pixelsPerUnit
+
     readonly property real tickStepPx: {
-        const ppi = root.pixelsPerInch;
-        if (!(ppi > 1))
+        const ppu = root.pixelsPerUnit;
+        if (!(ppu > 0.5))
             return 0;
-        return root.showHalfInchTicks ? (ppi * 0.5) : ppi;
+        // Major = 1 unit (in or cm); optional half-unit minor marks.
+        return root.showHalfInchTicks ? (ppu * 0.5) : ppu;
     }
 
     readonly property int ticksPerSide: {
@@ -873,25 +874,97 @@ Window {
         return null;
     }
 
+    function nearestEdgesFromFrame(g, pos) {
+        if (!g || !pos)
+            return null;
+        const left = g.x;
+        const right = g.x + g.width;
+        const top = g.y;
+        const bottom = g.y + g.height;
+        return {
+            x: (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right,
+            y: (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom
+        };
+    }
+
+    // Resolve which window guides should follow (move flags > hook > under cursor).
+    function resolveGuideWindow() {
+        const moving = root.windowBeingMovedOrResized();
+        if (moving)
+            return moving;
+        if (root.offsetTrackWindow)
+            return root.offsetTrackWindow;
+        return root.windowUnderCursor();
+    }
+
+    // Keep stickyEdge* updated. Called from guideSyncToken (cursor / stacking / rev).
+    // Main crosshair is independent (cursor only) — only secondary guides use this.
+    function syncAutoGuides() {
+        if (!root.autoOffsetOnMove) {
+            root.guidesSticky = false;
+            return;
+        }
+
+        const moving = root.windowBeingMovedOrResized();
+        if (moving)
+            root.offsetTrackWindow = moving;
+
+        // Drop track only when move/resize fully ended.
+        if (root.offsetTrackWindow && !moving) {
+            try {
+                const tw = root.offsetTrackWindow;
+                if (tw.move !== true && tw.resize !== true)
+                    root.offsetTrackWindow = null;
+            } catch (e) {
+                root.offsetTrackWindow = null;
+            }
+        }
+
+        const w = root.resolveGuideWindow();
+        if (!w) {
+            // No target: hide guides (hover left all windows / drag ended).
+            root.guidesSticky = false;
+            return;
+        }
+
+        const g = root.liveFrameGeometry(w);
+        const edges = root.nearestEdgesFromFrame(g, Workspace.cursorPos);
+        if (!edges) {
+            // Keep previous sticky edges if geometry glitched mid-frame.
+            if (root.guidesSticky)
+                return;
+            root.guidesSticky = false;
+            return;
+        }
+
+        root.stickyEdgeX = edges.x;
+        root.stickyEdgeY = edges.y;
+        root.guidesSticky = true;
+
+        // Bake into manual offsets so turning auto off keeps last edges.
+        root.offsetVerticalOffset = Math.round(edges.x - Workspace.cursorPos.x);
+        root.offsetHorizontalOffset = Math.round(edges.y - Workspace.cursorPos.y);
+    }
+
     // Nearest L/R → vertical guide offset; nearest T/B → horizontal guide offset.
     // offset = edge - cursor so (cursor + offset) sits on the edge.
     function setOffsetFromFrame(g, sourceTag) {
         if (!g)
             return false;
         const pos = Workspace.cursorPos;
-        const left = g.x;
-        const right = g.x + g.width;
-        const top = g.y;
-        const bottom = g.y + g.height;
-        const edgeX = (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
-        const edgeY = (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
-        root.offsetVerticalOffset = Math.round(edgeX - pos.x);
-        root.offsetHorizontalOffset = Math.round(edgeY - pos.y);
+        const edges = root.nearestEdgesFromFrame(g, pos);
+        if (!edges)
+            return false;
+        root.offsetVerticalOffset = Math.round(edges.x - pos.x);
+        root.offsetHorizontalOffset = Math.round(edges.y - pos.y);
+        root.stickyEdgeX = edges.x;
+        root.stickyEdgeY = edges.y;
+        root.guidesSticky = true;
         root.offsetVerticalEnabled = true;
         root.offsetHorizontalEnabled = true;
         console.log("InfiniteCrosshair guide offsets",
                     "v=", root.offsetVerticalOffset, "h=", root.offsetHorizontalOffset,
-                    "edge=", Math.round(edgeX) + "," + Math.round(edgeY),
+                    "edge=", Math.round(edges.x) + "," + Math.round(edges.y),
                     "src=", sourceTag || "n/a");
         return true;
     }
@@ -913,6 +986,7 @@ Window {
         root.offsetVerticalOffset = 0;
         root.offsetHorizontalOffset = 0;
         root.offsetTrackWindow = null;
+        root.guidesSticky = false;
         console.log("InfiniteCrosshair offset guides cleared");
     }
 
@@ -1164,8 +1238,10 @@ Window {
                     "lineWidth=", root.lineWidth,
                     "opacity=", root.lineOpacity,
                     "ticks=", root.showInchTicks,
+                    "units=", root.useMetricTicks ? "metric" : "imperial",
                     "diagIn=", root.screenDiagonalInches,
-                    "ppi=", root.pixelsPerInch.toFixed(2),
+                    "diagCm=", root.screenDiagonalCm,
+                    "ppu=", root.pixelsPerUnit.toFixed(2),
                     "tickStep=", root.tickStepPx.toFixed(2),
                     "autoOffset=", root.autoOffsetOnMove,
                     "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,

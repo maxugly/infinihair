@@ -12,7 +12,8 @@
 | Multi Configure dialogs | **Upstream KWin** — documented |
 | Offset guides (2nd V/H + color + offset) | **Shipped** |
 | Automagic border align + sticky while drag | **Shipped `offset5`** |
-| buildId | `2026-07-13-offset5` |
+| Tick units Imperial / Metric | **Shipped `units1`** |
+| buildId | `2026-07-13-units1` |
 
 ---
 

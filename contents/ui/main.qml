@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset5"
+    readonly property string buildId: "2026-07-13-units1"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -132,9 +132,15 @@ Window {
     property int lineWidth: 1
     property real lineOpacity: 0.8
     property bool showInchTicks: true
+    // 0 = Imperial (inch ticks), 1 = Metric (cm ticks)
+    property int tickUnits: 0
     property real screenDiagonalInches: 27.0
+    // Separate storage — never treat inch value as cm when switching units
+    property real screenDiagonalCm: 68.6
     property int tickLength: 10
     property bool showHalfInchTicks: true
+
+    readonly property bool useMetricTicks: root.tickUnits === 1
 
     // Tick stroke stays 1px — only the infinite lines use LineWidth.
     readonly property int tickStroke: 1
@@ -195,7 +201,9 @@ Window {
         + "print('LineWidth='+kr('LineWidth','1'))\n"
         + "print('Opacity='+kr('Opacity','0.8'))\n"
         + "print('ShowInchTicks='+kr('ShowInchTicks','true'))\n"
+        + "print('TickUnits='+kr('TickUnits','0'))\n"
         + "print('ScreenDiagonalInches='+kr('ScreenDiagonalInches','27.0'))\n"
+        + "print('ScreenDiagonalCm='+kr('ScreenDiagonalCm','68.6'))\n"
         + "print('TickLength='+kr('TickLength','10'))\n"
         + "print('ShowHalfInchTicks='+kr('ShowHalfInchTicks','true'))\n"
         + "print('OffsetVerticalEnabled='+kr('OffsetVerticalEnabled','false'))\n"
@@ -439,6 +447,21 @@ Window {
             root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true),
             sourceTag || "map"
         );
+        if (map.TickUnits !== undefined) {
+            const u = root.parseIntClamped(map.TickUnits, 0, 0, 1);
+            if (tickUnits !== u) {
+                console.log("InfiniteCrosshair TickUnits", tickUnits, "->", u,
+                            u === 1 ? "metric" : "imperial");
+                tickUnits = u;
+            }
+        }
+        if (map.ScreenDiagonalCm !== undefined) {
+            const cm = root.parseRealClamped(map.ScreenDiagonalCm, 68.6, 12.0, 305.0);
+            if (Math.abs(screenDiagonalCm - cm) > 0.0001) {
+                console.log("InfiniteCrosshair ScreenDiagonalCm", screenDiagonalCm, "->", cm);
+                screenDiagonalCm = cm;
+            }
+        }
         if (map.AutoOffsetOnMove !== undefined) {
             const ao = root.parseBool(map.AutoOffsetOnMove, true);
             if (autoOffsetOnMove !== ao) {
@@ -509,8 +532,8 @@ Window {
             "LineColorR": 1, "LineColorG": 1, "LineColorB": 1, "LineColor": 1,
             "OffsetVerticalColorR": 1, "OffsetVerticalColorG": 1, "OffsetVerticalColorB": 1, "OffsetVerticalColor": 1,
             "OffsetHorizontalColorR": 1, "OffsetHorizontalColorG": 1, "OffsetHorizontalColorB": 1, "OffsetHorizontalColor": 1,
-            "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1,
-            "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
+            "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1, "TickUnits": 1,
+            "ScreenDiagonalInches": 1, "ScreenDiagonalCm": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
             "OffsetVerticalEnabled": 1, "OffsetVerticalOffset": 1,
             "OffsetHorizontalEnabled": 1, "OffsetHorizontalOffset": 1,
             "AutoOffsetOnMove": 1
@@ -550,7 +573,9 @@ Window {
         const lw = root.parseIntClamped(KWin.readConfig("LineWidth", 1), 1, 1, 32);
         const op = root.parseRealClamped(KWin.readConfig("Opacity", 0.8), 0.8, 0.05, 1.0);
         const ticks = root.parseBool(KWin.readConfig("ShowInchTicks", true), true);
+        root.tickUnits = root.parseIntClamped(KWin.readConfig("TickUnits", 0), 0, 0, 1);
         const diag = root.parseRealClamped(KWin.readConfig("ScreenDiagonalInches", 27.0), 27.0, 5.0, 120.0);
+        root.screenDiagonalCm = root.parseRealClamped(KWin.readConfig("ScreenDiagonalCm", 68.6), 68.6, 12.0, 305.0);
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
         root.autoOffsetOnMove = root.parseBool(KWin.readConfig("AutoOffsetOnMove", true), true);
@@ -579,7 +604,7 @@ Window {
             root.setOffsetHorizontalColorRgb(hr, hg, hb, "seed");
         }
         console.log("InfiniteCrosshair seed rgb=", r, g, b,
-                    "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen,
+                    "lw=", lw, "op=", op, "ticks=", ticks, "units=", root.tickUnits, "tlen=", tlen,
                     "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,
                     "offH=", root.offsetHorizontalEnabled, root.offsetHorizontalOffset,
                     "autoOffset=", root.autoOffsetOnMove,
@@ -702,7 +727,9 @@ Window {
         return screens[0];
     }
 
-    readonly property real pixelsPerInch: {
+    // Pixels per physical unit for the active TickUnits system.
+    // Imperial: px per inch. Metric: px per centimeter. Diagonals are independent.
+    readonly property real pixelsPerUnit: {
         void Workspace.cursorPos;
         const screen = root.screenUnderCursor();
         let w = Workspace.virtualScreenSize.width;
@@ -711,16 +738,26 @@ Window {
             w = screen.geometry.width;
             h = screen.geometry.height;
         }
-        const diagIn = Math.max(0.1, root.screenDiagonalInches);
         const diagPx = Math.sqrt(w * w + h * h);
+        if (root.useMetricTicks) {
+            const diagCm = Math.max(0.1, root.screenDiagonalCm);
+            return diagPx / diagCm;
+        }
+        const diagIn = Math.max(0.1, root.screenDiagonalInches);
         return diagPx / diagIn;
     }
 
+    // Back-compat alias (logs / older mental model).
+    readonly property real pixelsPerInch: root.useMetricTicks
+        ? (root.pixelsPerUnit * 2.54)
+        : root.pixelsPerUnit
+
     readonly property real tickStepPx: {
-        const ppi = root.pixelsPerInch;
-        if (!(ppi > 1))
+        const ppu = root.pixelsPerUnit;
+        if (!(ppu > 0.5))
             return 0;
-        return root.showHalfInchTicks ? (ppi * 0.5) : ppi;
+        // Major = 1 unit (in or cm); optional half-unit minor marks.
+        return root.showHalfInchTicks ? (ppu * 0.5) : ppu;
     }
 
     readonly property int ticksPerSide: {
@@ -1201,8 +1238,10 @@ Window {
                     "lineWidth=", root.lineWidth,
                     "opacity=", root.lineOpacity,
                     "ticks=", root.showInchTicks,
+                    "units=", root.useMetricTicks ? "metric" : "imperial",
                     "diagIn=", root.screenDiagonalInches,
-                    "ppi=", root.pixelsPerInch.toFixed(2),
+                    "diagCm=", root.screenDiagonalCm,
+                    "ppu=", root.pixelsPerUnit.toFixed(2),
                     "tickStep=", root.tickStepPx.toFixed(2),
                     "autoOffset=", root.autoOffsetOnMove,
                     "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,

@@ -3,7 +3,7 @@
 **Date:** 2026-07-13  
 **Repo:** `~/.local/share/kwin/scripts/crosshair/` → https://github.com/maxugly/infinihair  
 **Plugin id:** `kwin-crosshair`  
-**buildId:** `2026-07-13-offset5`
+**buildId:** `2026-07-13-units1`
 
 ---
 
@@ -61,6 +61,18 @@ Uncheck auto-align → use Configure offsets + Meta+Shift+V/H.
 | **Meta+Shift+C** | Clear guides |
 
 Spec: [`specs/offset-line-mode.md`](specs/offset-line-mode.md)
+
+---
+
+## Ruler units (`units1`)
+
+| Units | Tick spacing | Diagonal field used |
+|---|---|---|
+| **Imperial** | 1 in (½ in minor) | `ScreenDiagonalInches` (default 27) |
+| **Metric** | 1 cm (½ cm minor) | `ScreenDiagonalCm` (default 68.6) |
+
+Fields are **independent** — switching units does not convert or copy values.  
+Configure form shows **both** diagonal boxes (genericscripted KCM cannot hide widgets on combo change). Spec: [`specs/tick-units.md`](specs/tick-units.md).
 
 ### KWin APIs used for move tracking
 
