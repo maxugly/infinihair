@@ -8,12 +8,18 @@ import org.kde.plasma.plasma5support as P5
 Window {
     id: root
 
+    // Bump when shipping behavior fixes — logged at ready so we can tell if
+    // System Settings re-enable is running a stale QML body from the session.
+    readonly property string buildId: "2026-07-13-color3"
+
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
     // on Wayland — BypassWindowManagerHint is X11-oriented).
     title: "Infinite Crosshair"
     visible: root.crosshairEnabled
-    color: "transparent"
+    // Explicit zero-alpha (string "transparent" has been observed as opaque black
+    // after some disable/re-enable cycles on Wayland).
+    color: Qt.rgba(0, 0, 0, 0)
     flags: Qt.Tool
          | Qt.FramelessWindowHint
          | Qt.WindowStaysOnTopHint
@@ -56,15 +62,19 @@ Window {
      *
      * Live path: kreadconfig6 against kwinrc (always fresh from disk).
      * Seed path: KWin.readConfig onCompleted (works even if DataSource fails).
+     *
+     * KEY=value lines avoid order/comma ambiguity (colors are R,G,B).
      */
     readonly property string configReadCmd:
-        "kreadconfig6 --file kwinrc --group " + configSection + " --key LineColor --default '#FF0000'; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key LineWidth --default 1; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key Opacity --default 0.8; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key ShowInchTicks --default true; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key ScreenDiagonalInches --default 27.0; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key TickLength --default 10; echo; "
-        + "kreadconfig6 --file kwinrc --group " + configSection + " --key ShowHalfInchTicks --default true; echo"
+        "printf 'LineColor='; kreadconfig6 --file kwinrc --group " + configSection + " --key LineColor --default '#FF0000'; echo; "
+        + "printf 'LineWidth='; kreadconfig6 --file kwinrc --group " + configSection + " --key LineWidth --default 1; echo; "
+        + "printf 'Opacity='; kreadconfig6 --file kwinrc --group " + configSection + " --key Opacity --default 0.8; echo; "
+        + "printf 'ShowInchTicks='; kreadconfig6 --file kwinrc --group " + configSection + " --key ShowInchTicks --default true; echo; "
+        + "printf 'ScreenDiagonalInches='; kreadconfig6 --file kwinrc --group " + configSection + " --key ScreenDiagonalInches --default 27.0; echo; "
+        + "printf 'TickLength='; kreadconfig6 --file kwinrc --group " + configSection + " --key TickLength --default 10; echo; "
+        + "printf 'ShowHalfInchTicks='; kreadconfig6 --file kwinrc --group " + configSection + " --key ShowHalfInchTicks --default true; echo"
+
+    property int configPollCount: 0
 
     function parseBool(v, fallback) {
         if (v === undefined || v === null || v === "")
@@ -91,80 +101,134 @@ Window {
         return Math.max(minV, Math.min(maxV, n));
     }
 
-    // KConfig Color entries are often "R,G,B" or "R,G,B,A" (0–255).
-    // QML color accepts #RRGGBB / #AARRGGBB / named colors, not bare R,G,B.
-    function parseColor(v, fallback) {
-        if (v === undefined || v === null || v === "")
-            return fallback;
+    // Always return a real QML color via Qt.rgba (never raw "R,G,B" strings).
+    // KWin.readConfig(Color) may hand us a QColor-like object; Qt.color(object)
+    // can silently become black after disable/re-enable — read channels instead.
+    function channel01(n, isByte) {
+        if (isNaN(n))
+            return 0;
+        if (isByte)
+            return Math.max(0, Math.min(255, n)) / 255;
+        return Math.max(0, Math.min(1, n));
+    }
 
-        // Already a QML/Qt color object (e.g. from KWin.readConfig).
+    function rgbaBytes(r, g, b, a) {
+        return Qt.rgba(channel01(r, true), channel01(g, true), channel01(b, true),
+                       a === undefined ? 1 : channel01(a, true));
+    }
+
+    function parseColor(v, fallback) {
+        const fb = (fallback === undefined || fallback === null || fallback === "")
+                 ? Qt.rgba(1, 0, 0, 1)
+                 : fallback;
+        if (v === undefined || v === null || v === "")
+            return fb;
+
+        // QML color / QColor-like: r,g,b,a in 0..1
         if (typeof v === "object") {
             try {
-                const c = Qt.color(v);
-                if (c && c.valid !== false)
-                    return c;
+                if (typeof v.r === "number" && typeof v.g === "number" && typeof v.b === "number") {
+                    const a = (typeof v.a === "number") ? v.a : 1;
+                    return Qt.rgba(channel01(v.r, v.r > 1 || v.g > 1 || v.b > 1),
+                                   channel01(v.g, v.r > 1 || v.g > 1 || v.b > 1),
+                                   channel01(v.b, v.r > 1 || v.g > 1 || v.b > 1),
+                                   channel01(a, a > 1));
+                }
             } catch (e) { /* fall through */ }
         }
 
         const s = String(v).trim();
         if (s.length === 0)
-            return fallback;
+            return fb;
 
-        // #RGB / #RRGGBB / #AARRGGBB / named colors
-        if (s.charAt(0) === "#" || s.indexOf("rgb") === 0 || s.indexOf("hsv") === 0) {
+        // #RGB / #RRGGBB / #AARRGGBB
+        if (s.charAt(0) === "#") {
             try {
                 const c = Qt.color(s);
-                if (c)
-                    return c;
+                if (c && typeof c.r === "number")
+                    return Qt.rgba(c.r, c.g, c.b, (typeof c.a === "number") ? c.a : 1);
             } catch (e) { /* fall through */ }
-            return s;
+            return fb;
         }
 
-        // KDE kwinrc: "255,170,127" or "255,170,127,255"
+        // rgb()/hsv() text
+        if (s.indexOf("rgb") === 0 || s.indexOf("hsv") === 0) {
+            try {
+                const c = Qt.color(s);
+                if (c && typeof c.r === "number")
+                    return Qt.rgba(c.r, c.g, c.b, (typeof c.a === "number") ? c.a : 1);
+            } catch (e) { /* fall through */ }
+            return fb;
+        }
+
+        // KDE kwinrc: "R,G,B" or "R,G,B,A" in 0–255 (integers)
         const parts = s.split(",");
         if (parts.length === 3 || parts.length === 4) {
-            const r = parseInt(parts[0].trim(), 10);
-            const g = parseInt(parts[1].trim(), 10);
-            const b = parseInt(parts[2].trim(), 10);
-            const a = parts.length === 4 ? parseInt(parts[3].trim(), 10) : 255;
-            if (![r, g, b, a].some(function (n) { return isNaN(n); })) {
-                const hx = function (n) {
-                    const t = Math.max(0, Math.min(255, n)).toString(16);
-                    return t.length === 1 ? "0" + t : t;
-                };
-                if (a >= 255)
-                    return "#" + hx(r) + hx(g) + hx(b);
-                return "#" + hx(a) + hx(r) + hx(g) + hx(b);
+            const nums = [];
+            let ok = true;
+            for (let i = 0; i < parts.length; ++i) {
+                const n = parseFloat(parts[i].trim());
+                if (isNaN(n)) {
+                    ok = false;
+                    break;
+                }
+                nums.push(n);
+            }
+            if (ok) {
+                // Prefer 0–255 when any channel > 1 (KConfig default).
+                const asBytes = nums[0] > 1 || nums[1] > 1 || nums[2] > 1
+                             || (nums.length === 3)
+                             || (nums.length === 4 && (nums[3] > 1 || nums[3] === 0));
+                if (asBytes) {
+                    return rgbaBytes(nums[0], nums[1], nums[2],
+                                     nums.length === 4 ? nums[3] : 255);
+                }
+                return Qt.rgba(channel01(nums[0], false), channel01(nums[1], false),
+                               channel01(nums[2], false),
+                               nums.length === 4 ? channel01(nums[3], false) : 1);
             }
         }
 
+        // Last resort: named colors only (avoid Qt.color on garbage → black).
         try {
             const c = Qt.color(s);
-            if (c)
-                return c;
+            if (c && typeof c.r === "number" && (c.r + c.g + c.b) > 0)
+                return Qt.rgba(c.r, c.g, c.b, (typeof c.a === "number") ? c.a : 1);
         } catch (e) { /* fall through */ }
-        return fallback;
+        return fb;
     }
 
     function colorKey(c) {
         try {
-            return Qt.color(c).toString().toLowerCase();
+            const col = root.parseColor(c, Qt.rgba(1, 0, 0, 1));
+            return [
+                Math.round(col.r * 255),
+                Math.round(col.g * 255),
+                Math.round(col.b * 255),
+                Math.round(((typeof col.a === "number") ? col.a : 1) * 255)
+            ].join(",");
         } catch (e) {
-            return String(c).toLowerCase();
+            return String(c);
         }
     }
 
     function applyConfigValues(color, lw, op, ticks, diag, tlen, half) {
-        const nextColor = root.parseColor(color, lineColor);
-        if (root.colorKey(lineColor) !== root.colorKey(nextColor)) {
-            console.log("InfiniteCrosshair LineColor", lineColor, "->", nextColor, "(raw=", color, ")");
+        // Never fall back to a stuck previous color — prefer red default.
+        const nextColor = root.parseColor(color, Qt.rgba(1, 0, 0, 1));
+        const prevKey = root.colorKey(lineColor);
+        const nextKey = root.colorKey(nextColor);
+        if (prevKey !== nextKey) {
+            console.log("InfiniteCrosshair LineColor", prevKey, "->", nextKey, "(raw=", color, "typeof=", typeof color, ")");
+            lineColor = nextColor;
+        } else {
+            // Re-assign so bindings refresh after disable/re-enable glitches.
             lineColor = nextColor;
         }
         if (lineWidth !== lw) {
             console.log("InfiniteCrosshair LineWidth", lineWidth, "->", lw);
             lineWidth = lw;
         }
-        if (lineOpacity !== op) {
+        if (Math.abs(lineOpacity - op) > 0.0001) {
             console.log("InfiniteCrosshair Opacity", lineOpacity, "->", op);
             lineOpacity = op;
         }
@@ -172,7 +236,7 @@ Window {
             console.log("InfiniteCrosshair ShowInchTicks", showInchTicks, "->", ticks);
             showInchTicks = ticks;
         }
-        if (screenDiagonalInches !== diag) {
+        if (Math.abs(screenDiagonalInches - diag) > 0.0001) {
             console.log("InfiniteCrosshair ScreenDiagonalInches", screenDiagonalInches, "->", diag);
             screenDiagonalInches = diag;
         }
@@ -186,24 +250,59 @@ Window {
         }
     }
 
+    function applyConfigMap(map) {
+        applyConfigValues(
+            map.LineColor !== undefined ? map.LineColor : "#FF0000",
+            root.parseIntClamped(map.LineWidth !== undefined ? map.LineWidth : 1, 1, 1, 32),
+            root.parseRealClamped(map.Opacity !== undefined ? map.Opacity : 0.8, 0.8, 0.05, 1.0),
+            root.parseBool(map.ShowInchTicks !== undefined ? map.ShowInchTicks : true, true),
+            root.parseRealClamped(map.ScreenDiagonalInches !== undefined ? map.ScreenDiagonalInches : 27.0, 27.0, 5.0, 120.0),
+            root.parseIntClamped(map.TickLength !== undefined ? map.TickLength : 10, 10, 2, 64),
+            root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true)
+        );
+    }
+
     function applyConfigLines(stdout) {
-        // Order matches configReadCmd (one value per non-empty line).
-        const lines = String(stdout).split(/\r?\n/).map(function (s) {
+        // Prefer KEY=value (new). Fall back to legacy positional lines.
+        const rawLines = String(stdout).split(/\r?\n/).map(function (s) {
             return s.trim();
         }).filter(function (s) {
             return s.length > 0;
         });
-        if (lines.length < 1)
+        if (rawLines.length < 1)
             return;
 
+        const map = ({});
+        let keyed = 0;
+        for (let i = 0; i < rawLines.length; ++i) {
+            const line = rawLines[i];
+            const eq = line.indexOf("=");
+            if (eq > 0) {
+                const k = line.substring(0, eq);
+                const v = line.substring(eq + 1);
+                if (k === "LineColor" || k === "LineWidth" || k === "Opacity"
+                        || k === "ShowInchTicks" || k === "ScreenDiagonalInches"
+                        || k === "TickLength" || k === "ShowHalfInchTicks") {
+                    map[k] = v;
+                    keyed += 1;
+                }
+            }
+        }
+
+        if (keyed > 0) {
+            applyConfigMap(map);
+            return;
+        }
+
+        // Legacy: one bare value per line in fixed order.
         applyConfigValues(
-            lines.length > 0 ? lines[0] : "#FF0000",
-            root.parseIntClamped(lines.length > 1 ? lines[1] : 1, 1, 1, 32),
-            root.parseRealClamped(lines.length > 2 ? lines[2] : 0.8, 0.8, 0.05, 1.0),
-            root.parseBool(lines.length > 3 ? lines[3] : true, true),
-            root.parseRealClamped(lines.length > 4 ? lines[4] : 27.0, 27.0, 5.0, 120.0),
-            root.parseIntClamped(lines.length > 5 ? lines[5] : 10, 10, 2, 64),
-            root.parseBool(lines.length > 6 ? lines[6] : true, true)
+            rawLines.length > 0 ? rawLines[0] : "#FF0000",
+            root.parseIntClamped(rawLines.length > 1 ? rawLines[1] : 1, 1, 1, 32),
+            root.parseRealClamped(rawLines.length > 2 ? rawLines[2] : 0.8, 0.8, 0.05, 1.0),
+            root.parseBool(rawLines.length > 3 ? rawLines[3] : true, true),
+            root.parseRealClamped(rawLines.length > 4 ? rawLines[4] : 27.0, 27.0, 5.0, 120.0),
+            root.parseIntClamped(rawLines.length > 5 ? rawLines[5] : 10, 10, 2, 64),
+            root.parseBool(rawLines.length > 6 ? rawLines[6] : true, true)
         );
     }
 
@@ -216,6 +315,9 @@ Window {
         const diag = root.parseRealClamped(KWin.readConfig("ScreenDiagonalInches", 27.0), 27.0, 5.0, 120.0);
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
+        console.log("InfiniteCrosshair seed raw LineColor=", color, "typeof=", typeof color,
+                    "key=", root.colorKey(root.parseColor(color, "#FF0000")),
+                    "lw=", lw, "ticks=", ticks, "tlen=", tlen);
         applyConfigValues(color, lw, op, ticks, diag, tlen, half);
     }
 
@@ -236,8 +338,17 @@ Window {
             if (!data)
                 return;
             const code = data["exit code"];
-            if (code !== 0 && code !== "0")
+            if (code !== 0 && code !== "0") {
+                if (root.configPollCount < 3)
+                    console.log("InfiniteCrosshair config poll fail code=", code,
+                                "stderr=", data.stderr || "");
                 return;
+            }
+            root.configPollCount += 1;
+            if (root.configPollCount <= 2) {
+                console.log("InfiniteCrosshair config poll #", root.configPollCount,
+                            "stdout=", (data.stdout || "").replace(/\n/g, " | "));
+            }
             root.applyConfigLines(data.stdout || "");
         }
     }
@@ -459,9 +570,10 @@ Window {
 
         const s = root.screenUnderCursor();
         const g = s ? s.geometry : null;
-        console.log("InfiniteCrosshair ready",
+        console.log("InfiniteCrosshair ready build=", root.buildId,
                     "virtual=", width, "x", height,
                     "screen=", g ? (g.width + "x" + g.height) : "n/a",
+                    "lineColor=", root.colorKey(root.lineColor),
                     "lineWidth=", root.lineWidth,
                     "ticks=", root.showInchTicks,
                     "diagIn=", root.screenDiagonalInches,
