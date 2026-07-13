@@ -5,8 +5,30 @@
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
   <group name="">
-    <entry name="LineColor" type="Color">
-      <default>#FF0000</default>
+    <!--
+      Color is stored as three Int channels (not KConfig Color / KColorButton).
+      The genericscripted KCM mishandles type=Color: the Configure UI shows the
+      default red, and Apply can delete the saved LineColor key — so settings
+      do not survive disable/re-enable. Int spinboxes persist reliably.
+      Legacy key LineColor (R,G,B or #RRGGBB) is still read by the script.
+    -->
+    <entry name="LineColorR" type="Int">
+      <label>Line color red (0–255)</label>
+      <default>255</default>
+      <min>0</min>
+      <max>255</max>
+    </entry>
+    <entry name="LineColorG" type="Int">
+      <label>Line color green (0–255)</label>
+      <default>0</default>
+      <min>0</min>
+      <max>255</max>
+    </entry>
+    <entry name="LineColorB" type="Int">
+      <label>Line color blue (0–255)</label>
+      <default>0</default>
+      <min>0</min>
+      <max>255</max>
     </entry>
     <entry name="LineWidth" type="Int">
       <default>1</default>

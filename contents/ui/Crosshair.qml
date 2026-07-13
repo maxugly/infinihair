@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-color3"
+    readonly property string buildId: "2026-07-13-persist1"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -44,7 +44,11 @@ Window {
     property bool crosshairEnabled: true
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
-    property color lineColor: "#FF0000"
+    // Color is RGB ints in kwinrc (LineColorR/G/B) — see main.xml.
+    property int lineColorR: 255
+    property int lineColorG: 0
+    property int lineColorB: 0
+    property color lineColor: Qt.rgba(1, 0, 0, 1)
     property int lineWidth: 1
     property real lineOpacity: 0.8
     property bool showInchTicks: true
@@ -63,16 +67,43 @@ Window {
      * Live path: kreadconfig6 against kwinrc (always fresh from disk).
      * Seed path: KWin.readConfig onCompleted (works even if DataSource fails).
      *
-     * KEY=value lines avoid order/comma ambiguity (colors are R,G,B).
+     * KEY=value lines. Color = LineColorR/G/B ints (plus legacy LineColor).
+     * migrate-color: if R/G/B unset but legacy LineColor exists, copy into ints
+     * so Configure + re-enable keep the same color.
      */
+    // python migrates legacy LineColor → LineColorR/G/B once, then dumps KEY=value.
     readonly property string configReadCmd:
-        "printf 'LineColor='; kreadconfig6 --file kwinrc --group " + configSection + " --key LineColor --default '#FF0000'; echo; "
-        + "printf 'LineWidth='; kreadconfig6 --file kwinrc --group " + configSection + " --key LineWidth --default 1; echo; "
-        + "printf 'Opacity='; kreadconfig6 --file kwinrc --group " + configSection + " --key Opacity --default 0.8; echo; "
-        + "printf 'ShowInchTicks='; kreadconfig6 --file kwinrc --group " + configSection + " --key ShowInchTicks --default true; echo; "
-        + "printf 'ScreenDiagonalInches='; kreadconfig6 --file kwinrc --group " + configSection + " --key ScreenDiagonalInches --default 27.0; echo; "
-        + "printf 'TickLength='; kreadconfig6 --file kwinrc --group " + configSection + " --key TickLength --default 10; echo; "
-        + "printf 'ShowHalfInchTicks='; kreadconfig6 --file kwinrc --group " + configSection + " --key ShowHalfInchTicks --default true; echo"
+        "python3 - <<'PY'\n"
+        + "import subprocess, os, re\n"
+        + "G=" + JSON.stringify(configSection) + "\n"
+        + "def kr(key, default=''):\n"
+        + "    r=subprocess.run(['kreadconfig6','--file','kwinrc','--group',G,'--key',key,'--default',str(default)],capture_output=True,text=True)\n"
+        + "    return (r.stdout or '').strip()\n"
+        + "def kw(key, val):\n"
+        + "    subprocess.run(['kwriteconfig6','--file','kwinrc','--group',G,'--key',key,str(val)],check=False)\n"
+        + "R,Gg,B=kr('LineColorR',''),kr('LineColorG',''),kr('LineColorB','')\n"
+        + "leg=kr('LineColor','')\n"
+        + "if R=='' and leg:\n"
+        + "    r,g,b=255,0,0\n"
+        + "    if leg.startswith('#') and len(leg)>=7:\n"
+        + "        h=leg[1:7]\n"
+        + "        r,g,b=int(h[0:2],16),int(h[2:4],16),int(h[4:6],16)\n"
+        + "    else:\n"
+        + "        parts=[p.strip() for p in leg.split(',')]\n"
+        + "        if len(parts)>=3:\n"
+        + "            try: r,g,b=int(float(parts[0])),int(float(parts[1])),int(float(parts[2]))\n"
+        + "            except: pass\n"
+        + "    kw('LineColorR', max(0,min(255,r))); kw('LineColorG', max(0,min(255,g))); kw('LineColorB', max(0,min(255,b)))\n"
+        + "print('LineColorR='+kr('LineColorR','255'))\n"
+        + "print('LineColorG='+kr('LineColorG','0'))\n"
+        + "print('LineColorB='+kr('LineColorB','0'))\n"
+        + "print('LineWidth='+kr('LineWidth','1'))\n"
+        + "print('Opacity='+kr('Opacity','0.8'))\n"
+        + "print('ShowInchTicks='+kr('ShowInchTicks','true'))\n"
+        + "print('ScreenDiagonalInches='+kr('ScreenDiagonalInches','27.0'))\n"
+        + "print('TickLength='+kr('TickLength','10'))\n"
+        + "print('ShowHalfInchTicks='+kr('ShowHalfInchTicks','true'))\n"
+        + "PY"
 
     property int configPollCount: 0
 
@@ -212,18 +243,25 @@ Window {
         }
     }
 
-    function applyConfigValues(color, lw, op, ticks, diag, tlen, half) {
-        // Never fall back to a stuck previous color — prefer red default.
-        const nextColor = root.parseColor(color, Qt.rgba(1, 0, 0, 1));
-        const prevKey = root.colorKey(lineColor);
-        const nextKey = root.colorKey(nextColor);
-        if (prevKey !== nextKey) {
-            console.log("InfiniteCrosshair LineColor", prevKey, "->", nextKey, "(raw=", color, "typeof=", typeof color, ")");
-            lineColor = nextColor;
-        } else {
-            // Re-assign so bindings refresh after disable/re-enable glitches.
-            lineColor = nextColor;
+    function setLineColorRgb(r, g, b, sourceTag) {
+        r = root.parseIntClamped(r, 255, 0, 255);
+        g = root.parseIntClamped(g, 0, 0, 255);
+        b = root.parseIntClamped(b, 0, 0, 255);
+        const prev = root.lineColorR + "," + root.lineColorG + "," + root.lineColorB;
+        const next = r + "," + g + "," + b;
+        root.lineColorR = r;
+        root.lineColorG = g;
+        root.lineColorB = b;
+        // Always rebuild the QML color (avoids black-stuck after re-enable).
+        root.lineColor = root.rgbaBytes(r, g, b, 255);
+        if (prev !== next) {
+            console.log("InfiniteCrosshair LineColor", prev, "->", next,
+                        "src=", sourceTag || "n/a");
         }
+    }
+
+    function applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, sourceTag) {
+        root.setLineColorRgb(r, g, b, sourceTag);
         if (lineWidth !== lw) {
             console.log("InfiniteCrosshair LineWidth", lineWidth, "->", lw);
             lineWidth = lw;
@@ -250,20 +288,32 @@ Window {
         }
     }
 
-    function applyConfigMap(map) {
+    function applyConfigMap(map, sourceTag) {
+        let r = 255, g = 0, b = 0;
+        if (map.LineColorR !== undefined || map.LineColorG !== undefined || map.LineColorB !== undefined) {
+            r = root.parseIntClamped(map.LineColorR, 255, 0, 255);
+            g = root.parseIntClamped(map.LineColorG, 0, 0, 255);
+            b = root.parseIntClamped(map.LineColorB, 0, 0, 255);
+        } else if (map.LineColor !== undefined && String(map.LineColor).length > 0) {
+            // Legacy single key.
+            const c = root.parseColor(map.LineColor, Qt.rgba(1, 0, 0, 1));
+            r = Math.round(c.r * 255);
+            g = Math.round(c.g * 255);
+            b = Math.round(c.b * 255);
+        }
         applyConfigValues(
-            map.LineColor !== undefined ? map.LineColor : "#FF0000",
+            r, g, b,
             root.parseIntClamped(map.LineWidth !== undefined ? map.LineWidth : 1, 1, 1, 32),
             root.parseRealClamped(map.Opacity !== undefined ? map.Opacity : 0.8, 0.8, 0.05, 1.0),
             root.parseBool(map.ShowInchTicks !== undefined ? map.ShowInchTicks : true, true),
             root.parseRealClamped(map.ScreenDiagonalInches !== undefined ? map.ScreenDiagonalInches : 27.0, 27.0, 5.0, 120.0),
             root.parseIntClamped(map.TickLength !== undefined ? map.TickLength : 10, 10, 2, 64),
-            root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true)
+            root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true),
+            sourceTag || "map"
         );
     }
 
-    function applyConfigLines(stdout) {
-        // Prefer KEY=value (new). Fall back to legacy positional lines.
+    function applyConfigLines(stdout, sourceTag) {
         const rawLines = String(stdout).split(/\r?\n/).map(function (s) {
             return s.trim();
         }).filter(function (s) {
@@ -274,15 +324,18 @@ Window {
 
         const map = ({});
         let keyed = 0;
+        const keys = {
+            "LineColorR": 1, "LineColorG": 1, "LineColorB": 1, "LineColor": 1,
+            "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1,
+            "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1
+        };
         for (let i = 0; i < rawLines.length; ++i) {
             const line = rawLines[i];
             const eq = line.indexOf("=");
             if (eq > 0) {
                 const k = line.substring(0, eq);
                 const v = line.substring(eq + 1);
-                if (k === "LineColor" || k === "LineWidth" || k === "Opacity"
-                        || k === "ShowInchTicks" || k === "ScreenDiagonalInches"
-                        || k === "TickLength" || k === "ShowHalfInchTicks") {
+                if (keys[k]) {
                     map[k] = v;
                     keyed += 1;
                 }
@@ -290,35 +343,27 @@ Window {
         }
 
         if (keyed > 0) {
-            applyConfigMap(map);
+            applyConfigMap(map, sourceTag || "poll");
             return;
         }
-
-        // Legacy: one bare value per line in fixed order.
-        applyConfigValues(
-            rawLines.length > 0 ? rawLines[0] : "#FF0000",
-            root.parseIntClamped(rawLines.length > 1 ? rawLines[1] : 1, 1, 1, 32),
-            root.parseRealClamped(rawLines.length > 2 ? rawLines[2] : 0.8, 0.8, 0.05, 1.0),
-            root.parseBool(rawLines.length > 3 ? rawLines[3] : true, true),
-            root.parseRealClamped(rawLines.length > 4 ? rawLines[4] : 27.0, 27.0, 5.0, 120.0),
-            root.parseIntClamped(rawLines.length > 5 ? rawLines[5] : 10, 10, 2, 64),
-            root.parseBool(rawLines.length > 6 ? rawLines[6] : true, true)
-        );
     }
 
     // Seed from KWin's config API (valid at script start / after full reload).
+    // Authoritative color is LineColorR/G/B; legacy LineColor is migrated by the
+    // disk poller (python) — do not let a stale LineColor override RGB ints.
     function seedFromReadConfig() {
-        const color = KWin.readConfig("LineColor", "#FF0000");
+        const r = root.parseIntClamped(KWin.readConfig("LineColorR", 255), 255, 0, 255);
+        const g = root.parseIntClamped(KWin.readConfig("LineColorG", 0), 0, 0, 255);
+        const b = root.parseIntClamped(KWin.readConfig("LineColorB", 0), 0, 0, 255);
         const lw = root.parseIntClamped(KWin.readConfig("LineWidth", 1), 1, 1, 32);
         const op = root.parseRealClamped(KWin.readConfig("Opacity", 0.8), 0.8, 0.05, 1.0);
         const ticks = root.parseBool(KWin.readConfig("ShowInchTicks", true), true);
         const diag = root.parseRealClamped(KWin.readConfig("ScreenDiagonalInches", 27.0), 27.0, 5.0, 120.0);
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
-        console.log("InfiniteCrosshair seed raw LineColor=", color, "typeof=", typeof color,
-                    "key=", root.colorKey(root.parseColor(color, "#FF0000")),
-                    "lw=", lw, "ticks=", ticks, "tlen=", tlen);
-        applyConfigValues(color, lw, op, ticks, diag, tlen, half);
+        console.log("InfiniteCrosshair seed rgb=", r, g, b,
+                    "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen);
+        applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, "seed");
     }
 
     function kickConfigPoll() {
@@ -349,7 +394,7 @@ Window {
                 console.log("InfiniteCrosshair config poll #", root.configPollCount,
                             "stdout=", (data.stdout || "").replace(/\n/g, " | "));
             }
-            root.applyConfigLines(data.stdout || "");
+            root.applyConfigLines(data.stdout || "", "poll");
         }
     }
 
@@ -573,8 +618,9 @@ Window {
         console.log("InfiniteCrosshair ready build=", root.buildId,
                     "virtual=", width, "x", height,
                     "screen=", g ? (g.width + "x" + g.height) : "n/a",
-                    "lineColor=", root.colorKey(root.lineColor),
+                    "rgb=", root.lineColorR + "," + root.lineColorG + "," + root.lineColorB,
                     "lineWidth=", root.lineWidth,
+                    "opacity=", root.lineOpacity,
                     "ticks=", root.showInchTicks,
                     "diagIn=", root.screenDiagonalInches,
                     "ppi=", root.pixelsPerInch.toFixed(2),
