@@ -8,16 +8,18 @@ import org.kde.plasma.plasma5support as P5
 Window {
     id: root
 
-    // Overlay surface: not a managed app window. BypassWindowManagerHint keeps
-    // it out of Alt+Tab / taskbar / pager (skipSwitcher etc. are KWin::Window
-    // client props and do not exist on QtQuick.Window).
+    // Stable caption so we can find this surface in Workspace.stackingOrder
+    // and set KWin client skip* flags (Qt window flags alone are not enough
+    // on Wayland — BypassWindowManagerHint is X11-oriented).
+    title: "Infinite Crosshair"
     visible: root.crosshairEnabled
     color: "transparent"
-    flags: Qt.BypassWindowManagerHint
+    flags: Qt.Tool
          | Qt.FramelessWindowHint
          | Qt.WindowStaysOnTopHint
          | Qt.WindowDoesNotAcceptFocus
          | Qt.WindowTransparentForInput
+         | Qt.BypassWindowManagerHint
 
     x: 0
     y: 0
@@ -27,6 +29,10 @@ Window {
     // Must match metadata.json KPlugin.Id → [Script-<Id>] in kwinrc
     readonly property string configSection: "Script-kwin-crosshair"
     readonly property string pluginId: "kwin-crosshair"
+    readonly property string overlayTitle: "Infinite Crosshair"
+    // Must match ShortcutHandler.name (KWin global-accel action id).
+    readonly property string toggleShortcutName: "Infinite Crosshair: Toggle"
+    readonly property string toggleShortcutDefault: "Meta+Shift+X"
 
     // Runtime visibility (toggle via ShortcutHandler; not the script Enabled flag).
     property bool crosshairEnabled: true
@@ -241,7 +247,66 @@ Window {
         function onVirtualScreenSizeChanged() {
             root.width = Workspace.virtualScreenSize.width;
             root.height = Workspace.virtualScreenSize.height;
+            root.hideOverlayFromWmLists();
         }
+        function onWindowAdded(window) {
+            root.claimOverlayClient(window);
+        }
+    }
+
+    // KWin client-side exclusion from Alt+Tab / taskbar / pager.
+    // Match only by our stable Window.title — full-screen heuristics are too risky.
+    function isOurOverlayClient(w) {
+        if (!w)
+            return false;
+        const cap = String(w.caption || "");
+        return cap === root.overlayTitle || cap.indexOf(root.overlayTitle) !== -1;
+    }
+
+    function claimOverlayClient(w) {
+        if (!root.isOurOverlayClient(w))
+            return false;
+        // Already claimed — keep flags sticky without spamming logs.
+        if (w.skipSwitcher === true && w.skipTaskbar === true && w.skipPager === true)
+            return true;
+        try {
+            w.skipSwitcher = true;
+            w.skipTaskbar = true;
+            w.skipPager = true;
+            if ("keepAbove" in w)
+                w.keepAbove = true;
+            console.log("InfiniteCrosshair claimed client caption=", String(w.caption || ""),
+                        "class=", String(w.resourceClass || ""),
+                        "skipSwitcher=", w.skipSwitcher);
+            return true;
+        } catch (e) {
+            console.log("InfiniteCrosshair claim failed", e);
+            return false;
+        }
+    }
+
+    function hideOverlayFromWmLists() {
+        const list = Workspace.stackingOrder;
+        if (!list)
+            return 0;
+        let claimed = 0;
+        for (let i = 0; i < list.length; ++i) {
+            if (root.claimOverlayClient(list[i]))
+                claimed += 1;
+        }
+        if (claimed > 0)
+            hideClaimRetry.stop();
+        else if (hideClaimRetry.tries === 3) {
+            for (let i = 0; i < list.length; ++i) {
+                const w = list[i];
+                if (!w)
+                    continue;
+                console.log("InfiniteCrosshair stack[", i, "] cap=", String(w.caption || ""),
+                            "class=", String(w.resourceClass || ""),
+                            "skipSw=", w.skipSwitcher);
+            }
+        }
+        return claimed;
     }
 
     // --- Screen resolution under cursor + PPI ---
@@ -370,19 +435,27 @@ Window {
         root.crosshairEnabled = !root.crosshairEnabled;
         console.log("InfiniteCrosshair toggled",
                     root.crosshairEnabled ? "ON" : "OFF");
+        if (root.crosshairEnabled) {
+            hideClaimRetry.tries = 0;
+            hideClaimRetry.restart();
+            Qt.callLater(root.hideOverlayFromWmLists);
+        }
     }
 
-    // System Settings → Keyboard → Shortcuts → KWin
+    // System Settings → Keyboard → Shortcuts → KWin (also listed in script Configure).
     ShortcutHandler {
-        name: "Infinite Crosshair: Toggle"
-        text: "Infinite Crosshair: Toggle"
-        sequence: "Meta+Shift+X"
+        name: root.toggleShortcutName
+        text: root.toggleShortcutName
+        sequence: root.toggleShortcutDefault
         onActivated: root.toggleCrosshair()
     }
 
     Component.onCompleted: {
         seedFromReadConfig();
         kickConfigPoll();
+        // Caption / client mapping can lag one frame after the surface maps.
+        Qt.callLater(root.hideOverlayFromWmLists);
+        hideClaimRetry.restart();
 
         const s = root.screenUnderCursor();
         const g = s ? s.geometry : null;
@@ -394,6 +467,21 @@ Window {
                     "diagIn=", root.screenDiagonalInches,
                     "ppi=", root.pixelsPerInch.toFixed(2),
                     "tickStep=", root.tickStepPx.toFixed(2),
-                    "enabled=", root.crosshairEnabled);
+                    "enabled=", root.crosshairEnabled,
+                    "toggle=", root.toggleShortcutDefault);
+    }
+
+    // Brief retries: Wayland maps the surface after onCompleted.
+    Timer {
+        id: hideClaimRetry
+        interval: 250
+        repeat: true
+        property int tries: 0
+        onTriggered: {
+            root.hideOverlayFromWmLists();
+            tries += 1;
+            if (tries >= 8)
+                stop();
+        }
     }
 }

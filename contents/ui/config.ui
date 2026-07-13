@@ -6,15 +6,63 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>420</width>
-    <height>280</height>
+    <width>460</width>
+    <height>420</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Infinite Crosshair</string>
   </property>
   <layout class="QFormLayout" name="formLayout">
-   <item row="0" column="0">
+   <item row="0" column="0" colspan="2">
+    <widget class="QGroupBox" name="groupShortcut">
+     <property name="title">
+      <string>Keyboard shortcut</string>
+     </property>
+     <layout class="QVBoxLayout" name="shortcutLayout">
+      <item>
+       <widget class="QLabel" name="labelShortcutAction">
+        <property name="text">
+         <string>&lt;b&gt;Toggle crosshair&lt;/b&gt; — action name: &lt;i&gt;Infinite Crosshair: Toggle&lt;/i&gt;</string>
+        </property>
+        <property name="textFormat">
+         <enum>Qt::RichText</enum>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelShortcutDefault">
+        <property name="text">
+         <string>Default binding: &lt;b&gt;Meta+Shift+X&lt;/b&gt; (Super+Shift+X)</string>
+        </property>
+        <property name="textFormat">
+         <enum>Qt::RichText</enum>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelShortcutHowTo">
+        <property name="text">
+         <string>Already registered with KWin global shortcuts. To view or rebind: &lt;b&gt;System Settings → Keyboard → Shortcuts&lt;/b&gt;, search for &lt;i&gt;Infinite Crosshair&lt;/i&gt; (under KWin). Script config cannot override global-accel bindings; rebind there.</string>
+        </property>
+        <property name="textFormat">
+         <enum>Qt::RichText</enum>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="1" column="0">
     <widget class="QLabel" name="labelLineColor">
      <property name="text">
       <string>Line color</string>
@@ -24,7 +72,7 @@
      </property>
     </widget>
    </item>
-   <item row="0" column="1">
+   <item row="1" column="1">
     <widget class="KColorButton" name="kcfg_LineColor">
      <property name="color">
       <color>
@@ -35,7 +83,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
+   <item row="2" column="0">
     <widget class="QLabel" name="labelLineWidth">
      <property name="text">
       <string>Line width</string>
@@ -45,7 +93,7 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="2" column="1">
     <widget class="QSpinBox" name="kcfg_LineWidth">
      <property name="minimum">
       <number>1</number>
@@ -61,7 +109,7 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
+   <item row="3" column="0">
     <widget class="QLabel" name="labelOpacity">
      <property name="text">
       <string>Opacity</string>
@@ -71,7 +119,7 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
+   <item row="3" column="1">
     <widget class="QDoubleSpinBox" name="kcfg_Opacity">
      <property name="decimals">
       <number>2</number>
@@ -90,7 +138,7 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="0">
+   <item row="4" column="0">
     <widget class="QLabel" name="labelShowInchTicks">
      <property name="text">
       <string>Show inch ticks</string>
@@ -100,7 +148,7 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="1">
+   <item row="4" column="1">
     <widget class="QCheckBox" name="kcfg_ShowInchTicks">
      <property name="text">
       <string>Tick marks every inch on the crosshair</string>
@@ -110,7 +158,7 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0">
+   <item row="5" column="0">
     <widget class="QLabel" name="labelScreenDiagonal">
      <property name="text">
       <string>Screen diagonal</string>
@@ -120,7 +168,7 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="1">
+   <item row="5" column="1">
     <widget class="QDoubleSpinBox" name="kcfg_ScreenDiagonalInches">
      <property name="toolTip">
       <string>Physical diagonal size of your monitor (e.g. 27 for a 27&quot; display). Combined with the detected resolution of the screen under the cursor to compute pixels-per-inch.</string>
@@ -145,7 +193,7 @@
      </property>
     </widget>
    </item>
-   <item row="5" column="0">
+   <item row="6" column="0">
     <widget class="QLabel" name="labelTickLength">
      <property name="text">
       <string>Tick length</string>
@@ -155,7 +203,7 @@
      </property>
     </widget>
    </item>
-   <item row="5" column="1">
+   <item row="6" column="1">
     <widget class="QSpinBox" name="kcfg_TickLength">
      <property name="minimum">
       <number>2</number>
@@ -171,7 +219,7 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="0">
+   <item row="7" column="0">
     <widget class="QLabel" name="labelShowHalfInchTicks">
      <property name="text">
       <string>Half-inch ticks</string>
@@ -181,7 +229,7 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="1">
+   <item row="7" column="1">
     <widget class="QCheckBox" name="kcfg_ShowHalfInchTicks">
      <property name="text">
       <string>Shorter marks every ½ inch</string>
