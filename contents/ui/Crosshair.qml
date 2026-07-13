@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset3"
+    readonly property string buildId: "2026-07-13-offset4"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -83,16 +83,23 @@ Window {
     // changes without a cursorPos change.
     property int autoAlignRev: 0
 
-    // Live target window for automagic edge align (move-tracked wins).
+    // Live target for automagic edge align. Priority:
+    // 1) window currently in interactive move/resize (KWin move/resize flags)
+    // 2) window from signal hooks (offsetTrackWindow)
+    // 3) window under cursor (hover)
+    // Cursor leave during drag is normal — (1)/(2) keep guides alive.
     readonly property var autoAlignWindow: {
         void Workspace.cursorPos;
         void Workspace.stackingOrder;
         void root.autoAlignRev;
+        if (!root.autoOffsetOnMove)
+            return null;
+        const moving = root.windowBeingMovedOrResized();
+        if (moving)
+            return moving;
         if (root.offsetTrackWindow)
             return root.offsetTrackWindow;
-        if (root.autoOffsetOnMove)
-            return root.windowUnderCursor();
-        return null;
+        return root.windowUnderCursor();
     }
 
     // Nearest frame edges for automagic (manual offset fallback when no window).
@@ -100,12 +107,14 @@ Window {
         void Workspace.cursorPos;
         void root.autoAlignRev;
         const w = root.autoAlignWindow;
-        const g = root.windowFrameGeometry(w);
+        const g = root.liveFrameGeometry(w);
         if (!g)
             return root.linePosX + root.offsetVerticalOffset;
         const pos = Workspace.cursorPos;
         const left = g.x;
         const right = g.x + g.width;
+        // While moving/resizing, prefer the edge that was nearer at grab-ish
+        // cursor, but always use live geometry so guides ride the window.
         return (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
     }
 
@@ -113,7 +122,7 @@ Window {
         void Workspace.cursorPos;
         void root.autoAlignRev;
         const w = root.autoAlignWindow;
-        const g = root.windowFrameGeometry(w);
+        const g = root.liveFrameGeometry(w);
         if (!g)
             return root.linePosY + root.offsetHorizontalOffset;
         const pos = Workspace.cursorPos;
@@ -139,8 +148,7 @@ Window {
         return root.linePosY + root.offsetHorizontalOffset;
     }
 
-    // Automagic shows both guides when auto-align has a window (unless cleared
-    // and auto is off). Manual toggles still apply when auto is off.
+    // Automagic: show guides whenever we have a target window (incl. mid-drag).
     readonly property bool showOffsetVertical: root.crosshairEnabled && (
         root.autoOffsetOnMove && root.autoAlignWindow
             ? true
@@ -786,6 +794,61 @@ Window {
         return null;
     }
 
+    // Prefer frameGeometry and touch its fields so QML rebinds when the
+    // window moves (move/resize updates geometry without always moving cursor).
+    function liveFrameGeometry(w) {
+        const g = root.windowFrameGeometry(w);
+        if (!g)
+            return null;
+        // Dependency pokes for reactive geometry (KWin Window properties).
+        try {
+            void g.x; void g.y; void g.width; void g.height;
+        } catch (e) { /* ignore */ }
+        try {
+            if (w) {
+                void w.x; void w.y; void w.width; void w.height;
+            }
+        } catch (e2) { /* ignore */ }
+        return g;
+    }
+
+    function isSkippableWindow(w) {
+        if (!w || root.isOurOverlayClient(w))
+            return true;
+        try {
+            if (w.deleted === true)
+                return true;
+            if (w.desktopWindow === true || w.dock === true)
+                return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    // KWin sets window.move / window.resize during interactive ops (same as
+    // Mouse Tiler). This works even when the cursor leaves the frame mid-drag.
+    function windowBeingMovedOrResized() {
+        void root.autoAlignRev;
+        void Workspace.cursorPos;
+        const list = Workspace.stackingOrder;
+        if (!list)
+            return null;
+        for (let i = list.length - 1; i >= 0; --i) {
+            const w = list[i];
+            if (root.isSkippableWindow(w))
+                continue;
+            try {
+                if (w.move === true || w.resize === true)
+                    return w;
+            } catch (e) { /* ignore */ }
+            try {
+                // Some builds expose moveable state differently.
+                if (w.interactiveMove === true || w.interactiveResize === true)
+                    return w;
+            } catch (e2) { /* ignore */ }
+        }
+        return null;
+    }
+
     function windowUnderCursor() {
         const list = Workspace.stackingOrder;
         if (!list)
@@ -793,13 +856,12 @@ Window {
         const pos = Workspace.cursorPos;
         for (let i = list.length - 1; i >= 0; --i) {
             const w = list[i];
-            if (!w || root.isOurOverlayClient(w))
+            if (root.isSkippableWindow(w))
                 continue;
+            // Prefer a window already in move/resize even if hit-test fails.
             try {
-                if (w.desktopWindow === true || w.dock === true)
-                    continue;
-                if (w.deleted === true)
-                    continue;
+                if (w.move === true || w.resize === true)
+                    return w;
             } catch (e) { /* ignore */ }
             const g = root.windowFrameGeometry(w);
             if (!g)
@@ -869,9 +931,11 @@ Window {
     }
 
     function refreshOffsetFromTrackedWindow() {
+        root.autoAlignRev += 1;
         const w = root.offsetTrackWindow;
         if (!w || !root.autoOffsetOnMove)
             return;
+        // Also bake into spinbox offsets so disabling auto keeps last edges.
         const g = root.windowFrameGeometry(w);
         root.setOffsetFromFrame(g, "move");
     }
@@ -884,38 +948,68 @@ Window {
                 return;
             w._infinihairOffsetHooked = true;
         } catch (e) {
-            // Some clients may not allow expando props; still connect.
+            // Some clients may not allow expando props; still connect below.
         }
+        // Signal path (Mouse Tiler pattern) + move/resize flag polling via
+        // windowBeingMovedOrResized() on cursor ticks.
         try {
             w.interactiveMoveResizeStarted.connect(function () {
                 if (!root.autoOffsetOnMove)
                     return;
                 root.offsetTrackWindow = w;
+                console.log("InfiniteCrosshair move/resize start",
+                            String(w.caption || w.resourceClass || "?"));
                 root.refreshOffsetFromTrackedWindow();
             });
             w.interactiveMoveResizeStepped.connect(function () {
-                if (root.offsetTrackWindow !== w)
+                // Always bump rev while this client steps — even if track pointer
+                // was lost; windowBeingMovedOrResized still finds move===true.
+                if (!root.autoOffsetOnMove)
                     return;
+                if (!root.offsetTrackWindow)
+                    root.offsetTrackWindow = w;
                 root.refreshOffsetFromTrackedWindow();
             });
             w.interactiveMoveResizeFinished.connect(function () {
-                if (root.offsetTrackWindow === w) {
+                if (root.offsetTrackWindow === w || root.offsetTrackWindow === null) {
                     root.refreshOffsetFromTrackedWindow();
-                    // Keep mode + last offset so the next placement still shows edges.
-                    root.offsetTrackWindow = null;
+                    if (root.offsetTrackWindow === w)
+                        root.offsetTrackWindow = null;
+                    root.autoAlignRev += 1;
+                    console.log("InfiniteCrosshair move/resize end");
                 }
             });
         } catch (e2) {
             console.log("InfiniteCrosshair hook move/resize failed", e2);
         }
+        // Geometry changes during move (extra rev bumps if signals exist).
+        try {
+            if (w.frameGeometryChanged) {
+                w.frameGeometryChanged.connect(function () {
+                    try {
+                        if (w.move === true || w.resize === true
+                                || root.offsetTrackWindow === w) {
+                            root.autoAlignRev += 1;
+                        }
+                    } catch (e3) {
+                        if (root.offsetTrackWindow === w)
+                            root.autoAlignRev += 1;
+                    }
+                });
+            }
+        } catch (e4) { /* optional */ }
     }
 
     function hookAllWindowsMoveResize() {
         const list = Workspace.stackingOrder;
         if (!list)
             return;
-        for (let i = 0; i < list.length; ++i)
+        let n = 0;
+        for (let i = 0; i < list.length; ++i) {
             root.hookWindowMoveResize(list[i]);
+            n += 1;
+        }
+        console.log("InfiniteCrosshair hooked windows for move/resize count=", n);
     }
 
     // Primary vertical (cursor)
