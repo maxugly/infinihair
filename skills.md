@@ -79,6 +79,15 @@
 
 Full skill definition: `skills/SENTINEL.md`. Testing rationale: `docs/TESTING_STRATEGY.md`.
 
+---
+
+## 🔬 Skill 5: The KWin Researcher (Lifecycle & peers)
+*Focus: KWin Scripting load/unload, config Apply, QML cache, comparison to working scripts.*
+
+Full skill definition: `skills/KWIN_RESEARCHER.md`. Research plan: `specs/research-kwin-lifecycle.md`.
+
+Use this when Configure does nothing, disable/re-enable misbehaves, or peers work and we do not. **Do not** ship product QML while research is open (see `STATUS.md` freeze).
+
 ### Core Competencies
 1.  **Distro-agnostic build**: `./scripts/package.sh` needs only `python3` (no apt/pacman/dnf in project scripts).
 2.  **CI/CD Pipeline**: Workflows call `package.sh` / `check.sh` on every push/PR.

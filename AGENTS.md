@@ -31,6 +31,18 @@ yourself writing code without first checking whether Bones has a plan for it
 in `specs/` + `TODO.md`, you're off the rails. If you commit without a QA pass
 when the change is non-trivial, you're off the rails.
 
+### Research freeze (active as of 2026-07-13)
+
+Read **`STATUS.md` first**. Product QML/feature work is **paused** until Bones
+closes `specs/research-kwin-lifecycle.md` with decision A/B/C.
+
+- Grok: docs, packaging, or **tasked** instrumentation only.
+- Bones: owns KWin lifecycle research plan (skill: `skills/KWIN_RESEARCHER.md`).
+- Grit: does not PASS “features” during freeze; may QA instrumentation.
+- Max: runs live E1–E4 checks when available.
+
+**Do not** thrash color storage or Window flags without research evidence.
+
 ## The cycle
 
 ```
@@ -137,20 +149,22 @@ on `PATH` (`python3` required; `kpackagetool6` / `shellcheck` optional unless
 ```
 crosshair/   # also known as infinihair on GitHub
 ├── AGENTS.md                 # ← you are here — master crew plan
+├── STATUS.md                 # honest "where we are" snapshot (read first)
 ├── constitution.md           # immutable engineering laws
-├── spec.md                   # formal product requirements
+├── spec.md                   # formal product requirements (may lag code)
 ├── PHASED_IMPLEMENTATION.md  # phase gates 0–5
 ├── TODO.md                   # task tracker (Bones writes, Grok marks done)
-├── metadata.json             # KPackage identity
+├── metadata.json             # KPackage identity (Id: kwin-crosshair)
 ├── contents/
 │   ├── ui/                   # Grok/Artisan territory (QML)
-│   │   ├── main.qml          # KWin entry
-│   │   └── Crosshair.qml     # render SSoT
+│   │   ├── main.qml          # KWin entry (currently full impl — debt)
+│   │   ├── Crosshair.qml     # intended render SSoT (currently dupe of main)
+│   │   └── config.ui         # Configure form (KCM loads THIS path)
 │   ├── code/main.js          # lifecycle stub
-│   └── config/               # KConfigXT (Phase 2+)
-├── scripts/                  # package.sh, check.sh (Sentinel/Grit)
+│   └── config/               # main.xml schema; main.ui empty legacy stub
+├── scripts/                  # package.sh, check.sh, reload.sh (Sentinel/Grit)
 ├── skills/                   # ARCHITECT, ARTISAN, STRATEGIST, SENTINEL
-├── specs/                    # Bones' territory
+├── specs/                    # Bones' territory (bugs + phases)
 │   └── AGENTS.md
 ├── qa/                       # Grit's territory
 │   └── AGENTS.md
@@ -162,11 +176,21 @@ crosshair/   # also known as infinihair on GitHub
 | what | where |
 |---|---|
 | live package / repo | `~/.local/share/kwin/scripts/crosshair/` |
+| installed runtime tree | `~/.local/share/kwin/scripts/kwin-crosshair/` (from kpackagetool) |
 | GitHub | `https://github.com/maxugly/infinihair` |
 | chat file | `~/.hermes/agents/chat.md` |
+| status snapshot | `STATUS.md` |
 | Architect skill | `skills/ARCHITECT.md` + `agy` |
 | QA skill | `skills/SENTINEL.md` + `qa/` |
 | Agy (Antigravity) | `/home/m/.local/bin/agy` |
+
+## Open work (see STATUS.md)
+
+| id | summary | next |
+|---|---|---|
+| RESEARCH | KWin load/unload/config vs peers | Bones + Max; skill KWIN_RESEARCHER |
+| BUG-02 | Multi Configure dialogs | wontfix-package |
+| BUG-03 | Color picker Apply dead | after research decision |
 
 ## Phased ownership
 

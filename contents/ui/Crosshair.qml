@@ -10,13 +10,16 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-persist1"
+    readonly property string buildId: "2026-07-13-reen1"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
     // on Wayland — BypassWindowManagerHint is X11-oriented).
     title: "Infinite Crosshair"
-    visible: root.crosshairEnabled
+    // ALWAYS mapped. Toggling Window.visible unmaps/remaps the full-screen
+    // surface on Wayland and can drop WindowTransparentForInput — user then
+    // loses pointer control of the desktop/UI (BUG-01). Hide draw items only.
+    visible: true
     // Explicit zero-alpha (string "transparent" has been observed as opaque black
     // after some disable/re-enable cycles on Wayland).
     color: Qt.rgba(0, 0, 0, 0)
@@ -44,7 +47,8 @@ Window {
     property bool crosshairEnabled: true
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
-    // Color is RGB ints in kwinrc (LineColorR/G/B) — see main.xml.
+    // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
+    // channel ints + Qt.rgba rebuild so re-enable never sticks on a black QColor.
     property int lineColorR: 255
     property int lineColorG: 0
     property int lineColorB: 0
@@ -67,36 +71,50 @@ Window {
      * Live path: kreadconfig6 against kwinrc (always fresh from disk).
      * Seed path: KWin.readConfig onCompleted (works even if DataSource fails).
      *
-     * KEY=value lines. Color = LineColorR/G/B ints (plus legacy LineColor).
-     * migrate-color: if R/G/B unset but legacy LineColor exists, copy into ints
-     * so Configure + re-enable keep the same color.
+     * Color: UI writes LineColor (KConfig Color). We also mirror LineColorR/G/B
+     * ints on disk (not in the form) so re-enable still has channels if Color
+     * load is flaky. Poller keeps both in sync, then dumps KEY=value.
      */
-    // python migrates legacy LineColor → LineColorR/G/B once, then dumps KEY=value.
     readonly property string configReadCmd:
         "python3 - <<'PY'\n"
-        + "import subprocess, os, re\n"
+        + "import subprocess\n"
         + "G=" + JSON.stringify(configSection) + "\n"
         + "def kr(key, default=''):\n"
         + "    r=subprocess.run(['kreadconfig6','--file','kwinrc','--group',G,'--key',key,'--default',str(default)],capture_output=True,text=True)\n"
         + "    return (r.stdout or '').strip()\n"
         + "def kw(key, val):\n"
         + "    subprocess.run(['kwriteconfig6','--file','kwinrc','--group',G,'--key',key,str(val)],check=False)\n"
-        + "R,Gg,B=kr('LineColorR',''),kr('LineColorG',''),kr('LineColorB','')\n"
+        + "def parse_color(s):\n"
+        + "    s=(s or '').strip()\n"
+        + "    if not s: return None\n"
+        + "    if s.startswith('#') and len(s)>=7:\n"
+        + "        h=s[1:7]; return int(h[0:2],16),int(h[2:4],16),int(h[4:6],16)\n"
+        + "    parts=[p.strip() for p in s.split(',')]\n"
+        + "    if len(parts)>=3:\n"
+        + "        try:\n"
+        + "            a,b,c=float(parts[0]),float(parts[1]),float(parts[2])\n"
+        + "            if a>1 or b>1 or c>1:\n"
+        + "                return int(a),int(b),int(c)\n"
+        + "            if any('.' in parts[i] for i in range(3)):\n"
+        + "                return int(round(a*255)),int(round(b*255)),int(round(c*255))\n"
+        + "            return int(a),int(b),int(c)\n"
+        + "        except: return None\n"
+        + "    return None\n"
         + "leg=kr('LineColor','')\n"
-        + "if R=='' and leg:\n"
-        + "    r,g,b=255,0,0\n"
-        + "    if leg.startswith('#') and len(leg)>=7:\n"
-        + "        h=leg[1:7]\n"
-        + "        r,g,b=int(h[0:2],16),int(h[2:4],16),int(h[4:6],16)\n"
-        + "    else:\n"
-        + "        parts=[p.strip() for p in leg.split(',')]\n"
-        + "        if len(parts)>=3:\n"
-        + "            try: r,g,b=int(float(parts[0])),int(float(parts[1])),int(float(parts[2]))\n"
-        + "            except: pass\n"
-        + "    kw('LineColorR', max(0,min(255,r))); kw('LineColorG', max(0,min(255,g))); kw('LineColorB', max(0,min(255,b)))\n"
-        + "print('LineColorR='+kr('LineColorR','255'))\n"
-        + "print('LineColorG='+kr('LineColorG','0'))\n"
-        + "print('LineColorB='+kr('LineColorB','0'))\n"
+        + "R,Gg,B=kr('LineColorR',''),kr('LineColorG',''),kr('LineColorB','')\n"
+        + "rgb=parse_color(leg)\n"
+        + "if rgb is None and R!='':\n"
+        + "    try: rgb=(max(0,min(255,int(float(R)))),max(0,min(255,int(float(Gg or 0)))),max(0,min(255,int(float(B or 0)))))\n"
+        + "    except: rgb=None\n"
+        + "if rgb is None: rgb=(255,0,0)\n"
+        + "r,g,b=rgb\n"
+        + "kw('LineColorR',r); kw('LineColorG',g); kw('LineColorB',b)\n"
+        + "# Keep Color key populated so KColorButton reloads the saved tint\n"
+        + "kw('LineColor','%d,%d,%d'%(r,g,b))\n"
+        + "print('LineColor=%d,%d,%d'%(r,g,b))\n"
+        + "print('LineColorR='+str(r))\n"
+        + "print('LineColorG='+str(g))\n"
+        + "print('LineColorB='+str(b))\n"
         + "print('LineWidth='+kr('LineWidth','1'))\n"
         + "print('Opacity='+kr('Opacity','0.8'))\n"
         + "print('ShowInchTicks='+kr('ShowInchTicks','true'))\n"
@@ -290,12 +308,13 @@ Window {
 
     function applyConfigMap(map, sourceTag) {
         let r = 255, g = 0, b = 0;
-        if (map.LineColorR !== undefined || map.LineColorG !== undefined || map.LineColorB !== undefined) {
+        // Prefer explicit channels (mirrored by poller); else KConfig Color string.
+        if (map.LineColorR !== undefined && map.LineColorG !== undefined && map.LineColorB !== undefined
+                && String(map.LineColorR).length > 0) {
             r = root.parseIntClamped(map.LineColorR, 255, 0, 255);
             g = root.parseIntClamped(map.LineColorG, 0, 0, 255);
             b = root.parseIntClamped(map.LineColorB, 0, 0, 255);
         } else if (map.LineColor !== undefined && String(map.LineColor).length > 0) {
-            // Legacy single key.
             const c = root.parseColor(map.LineColor, Qt.rgba(1, 0, 0, 1));
             r = Math.round(c.r * 255);
             g = Math.round(c.g * 255);
@@ -349,12 +368,18 @@ Window {
     }
 
     // Seed from KWin's config API (valid at script start / after full reload).
-    // Authoritative color is LineColorR/G/B; legacy LineColor is migrated by the
-    // disk poller (python) — do not let a stale LineColor override RGB ints.
+    // Prefer channel ints when present (stable across re-enable); else LineColor.
+    // Disk poller is authoritative shortly after start and keeps Color↔RGB mirrored.
     function seedFromReadConfig() {
-        const r = root.parseIntClamped(KWin.readConfig("LineColorR", 255), 255, 0, 255);
-        const g = root.parseIntClamped(KWin.readConfig("LineColorG", 0), 0, 0, 255);
-        const b = root.parseIntClamped(KWin.readConfig("LineColorB", 0), 0, 0, 255);
+        let r = root.parseIntClamped(KWin.readConfig("LineColorR", -1), -1, -1, 255);
+        let g = root.parseIntClamped(KWin.readConfig("LineColorG", -1), -1, -1, 255);
+        let b = root.parseIntClamped(KWin.readConfig("LineColorB", -1), -1, -1, 255);
+        if (r < 0 || g < 0 || b < 0) {
+            const c = root.parseColor(KWin.readConfig("LineColor", "#FF0000"), Qt.rgba(1, 0, 0, 1));
+            r = Math.round(c.r * 255);
+            g = Math.round(c.g * 255);
+            b = Math.round(c.b * 255);
+        }
         const lw = root.parseIntClamped(KWin.readConfig("LineWidth", 1), 1, 1, 32);
         const op = root.parseRealClamped(KWin.readConfig("Opacity", 0.8), 0.8, 0.05, 1.0);
         const ticks = root.parseBool(KWin.readConfig("ShowInchTicks", true), true);
@@ -362,7 +387,8 @@ Window {
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
         console.log("InfiniteCrosshair seed rgb=", r, g, b,
-                    "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen);
+                    "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen,
+                    "build=", root.buildId);
         applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, "seed");
     }
 
@@ -524,6 +550,7 @@ Window {
 
     // Vertical line
     Rectangle {
+        visible: root.crosshairEnabled
         x: Workspace.cursorPos.x - Math.max(1, root.lineWidth) / 2
         y: 0
         width: Math.max(1, root.lineWidth)
@@ -535,6 +562,7 @@ Window {
 
     // Horizontal line
     Rectangle {
+        visible: root.crosshairEnabled
         x: 0
         y: Workspace.cursorPos.y - Math.max(1, root.lineWidth) / 2
         width: parent.width
@@ -549,7 +577,7 @@ Window {
         id: tickOrigin
         x: Workspace.cursorPos.x
         y: Workspace.cursorPos.y
-        visible: root.showInchTicks && root.tickStepPx > 0.5
+        visible: root.crosshairEnabled && root.showInchTicks && root.tickStepPx > 0.5
         z: 10000
 
         Repeater {
@@ -588,14 +616,11 @@ Window {
     }
 
     function toggleCrosshair() {
+        // Visual-only: do not touch Window.visible (see buildId toggle1 / BUG-01).
         root.crosshairEnabled = !root.crosshairEnabled;
         console.log("InfiniteCrosshair toggled",
-                    root.crosshairEnabled ? "ON" : "OFF");
-        if (root.crosshairEnabled) {
-            hideClaimRetry.tries = 0;
-            hideClaimRetry.restart();
-            Qt.callLater(root.hideOverlayFromWmLists);
-        }
+                    root.crosshairEnabled ? "ON" : "OFF",
+                    "build=", root.buildId);
     }
 
     // System Settings → Keyboard → Shortcuts → KWin (also listed in script Configure).

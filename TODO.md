@@ -1,83 +1,68 @@
 # Project Todo List — infinihair
 
 > **Bones** writes and prioritizes. **Grok** marks `[x]` when done.  
-> Specs live in `specs/`. Do not invent architecture in this file — link a spec.
+> Specs live in `specs/`.  
+> **Live snapshot:** [STATUS.md](STATUS.md)
 
-## Status
+## Mode: RESEARCH FREEZE (2026-07-13)
 
-| phase | status | notes |
+**No product feature coding** until `specs/research-kwin-lifecycle.md` has a Bones decision (A/B/C).
+
+| track | status |
+|---|---|
+| Phase 0–1 skeleton / red line | historically PASS |
+| Config UI + live poll + overlay | **in tree** but **not accepted by Max** |
+| Color picker UI | restored (reen1) — **Apply appears dead to Max** |
+| Disable/re-enable vs peers | **research open** |
+| Multi Configure dialogs | wontfix-package (KCM host) |
+
+---
+
+## Active — KWin lifecycle research
+
+Spec: [specs/research-kwin-lifecycle.md](specs/research-kwin-lifecycle.md)  
+Skill: [skills/KWIN_RESEARCHER.md](skills/KWIN_RESEARCHER.md)
+
+- [ ] **Bones:** refine research questions / order experiments; append chat handoff
+- [ ] **Max:** E1–E4 checklist in STATUS / research spec (isScriptLoaded, kwinrc, journal, peer compare)
+- [ ] **Grok:** only if Bones tasks instrumentation or minimal repro (no drive-by QML)
+- [ ] **Grit:** QA any research instrumentation; later QA the real fix PR
+- [ ] **Bones:** write decision A/B/C + Grok task list; unfreeze
+
+---
+
+## Parked bugs (do not implement until unfreeze)
+
+| id | issue | note |
 |---|---|---|
-| **0** Skeleton & validation | **PASS** | package + check + kpackagetool install OK (2026-07-13) |
-| **1** Red line (hardcoded) | **PASS** | implemented 2026-07-13; Grit static QA PASS — Max visual smoke pending |
-| **2** Config schema + UI | pending | |
-| **3** Bind config to QML | pending | |
-| **4** Edge case hardening | pending | |
-| **5** Packaging / dist | partial | `package.sh` / `check.sh` / CI exist; `reload.sh` empty |
+| BUG-01b | Settings disable→re-enable | subsumed by research |
+| BUG-02 | Multi Configure dialogs | wontfix-package |
+| BUG-03 | Color picker / Apply | picker back; **behavior dead** per Max — research |
+| debt | main.qml ≡ Crosshair.qml | after lifecycle decision |
 
 ---
 
-## Phase 0 — Skeleton (Bones)
+## Phase tracker (historical / not current focus)
 
-- [x] KPackage layout: `contents/{ui,code,config}`, `metadata.json`
-- [x] `X-Plasma-API: declarativescript`, `X-Plasma-MainScript: ui/main.qml`
-- [x] `KPlugin.Id: kwin-crosshair`, Version SemVer `1.0.0`
-- [x] `contents/code/main.js` lifecycle stub
-- [x] `contents/ui/main.qml` entry + `Crosshair.qml` placeholder (no render logic)
-- [x] Litmus: `./scripts/package.sh` && `./scripts/check.sh` exit 0
-- [x] Crew setup: `AGENTS.md`, `specs/`, `qa/`, chat handoff (this cycle)
-
-Spec: [specs/phase-0-skeleton.md](specs/phase-0-skeleton.md)
+| phase | status |
+|---|---|
+| 0 Skeleton | PASS |
+| 1 Red line | PASS then heavily extended |
+| 2–3 Config + bind | code present; **not product-accepted** |
+| 4 Edge cases | blocked on research |
+| 5 Packaging | package/check/reload exist |
 
 ---
 
-## Phase 1 — Red line / Artisan (Grok)
+## Packaging (ok to run during freeze)
 
-Spec: [specs/phase-1-red-line.md](specs/phase-1-red-line.md) *(Bones to flesh if thin)*
-
-- [x] Implement hardcoded red lines in `contents/ui/Crosshair.qml` (`#FF0000`, 1px, opacity 0.8)
-- [x] Bind position to `workspace.cursorPos` only (no Timer, no Behavior)
-- [x] `z: 9999`; span full virtual desktop (`workspace.workspaceWidth` / `workspace.workspaceHeight` or virtual screen size)
-- [x] Keep `main.qml` as thin entry only
-- [x] Do **not** add `KWin.readConfig` yet (Phase 3)
-- [x] Run `./scripts/package.sh` && `./scripts/check.sh`
-- [x] Hand off to Grit for QA review under `qa/` — see `qa/review-phase1-20260713.md`
+- [x] `scripts/package.sh` / `check.sh` / `reload.sh`
+- [ ] README polish → maxugly/infinihair (after research)
 
 ---
 
-## Phase 2 — Config schema (Bones plan → Grok)
+## Process
 
-- [ ] Spec in `specs/config-ui.md` (if not covered by `spec.md` §3–4)
-- [ ] `contents/config/main.xml` keys: LineColor, LineWidth, Opacity
-- [ ] `contents/config/main.ui` with `kcfg_*` widgets
-- [ ] Configure button works in System Settings
-
----
-
-## Phase 3 — Bind config (Grok)
-
-- [ ] `KWin.readConfig` in QML; defaults match `main.xml`
-- [ ] Dynamic update without full session restart where possible
-
----
-
-## Phase 4 — Edge cases (Grit + Grok)
-
-- [ ] Multi-monitor, hotplug, fullscreen z-order, Wayland/X11 smoke
-
----
-
-## Phase 5 — Packaging polish
-
-- [x] `scripts/package.sh` (python3-only, distro-agnostic)
-- [x] `scripts/check.sh`
-- [x] `.github/workflows/ci.yml`
-- [ ] `scripts/reload.sh` body
-- [ ] README paths → `maxugly/infinihair`
-
----
-
-## Backlog / process
-
-- [x] Multi-agent crew file (`AGENTS.md`) matching civitui pattern
-- [ ] Delete or archive accidental GitHub repo `maxugly/-hair` if still present
-- [ ] Optional: pre-commit hook calling `./scripts/package.sh`
+- [x] Multi-agent crew (`AGENTS.md`)
+- [x] STATUS + research spec + KWIN_RESEARCHER skill
+- [ ] Commit + push freeze docs + reen1 tree (this cycle)
