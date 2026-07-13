@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset1"
+    readonly property string buildId: "2026-07-13-offset2"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -42,29 +42,43 @@ Window {
     // Must match ShortcutHandler.name (KWin global-accel action id).
     readonly property string toggleShortcutName: "Infinite Crosshair: Toggle"
     readonly property string toggleShortcutDefault: "Meta+Shift+X"
-    readonly property string offsetModeShortcutName: "Infinite Crosshair: Offset Mode"
-    readonly property string offsetModeShortcutDefault: "Meta+Shift+O"
+    readonly property string toggleOffsetVShortcutName: "Infinite Crosshair: Toggle Offset Vertical"
+    readonly property string toggleOffsetVShortcutDefault: "Meta+Shift+V"
+    readonly property string toggleOffsetHShortcutName: "Infinite Crosshair: Toggle Offset Horizontal"
+    readonly property string toggleOffsetHShortcutDefault: "Meta+Shift+H"
     readonly property string captureOffsetShortcutName: "Infinite Crosshair: Capture Border Offset"
     readonly property string captureOffsetShortcutDefault: "Meta+Shift+B"
-    readonly property string clearOffsetShortcutName: "Infinite Crosshair: Clear Offset"
+    readonly property string clearOffsetShortcutName: "Infinite Crosshair: Clear Offset Guides"
     readonly property string clearOffsetShortcutDefault: "Meta+Shift+C"
 
     // Runtime visibility (toggle via ShortcutHandler; not the script Enabled flag).
     property bool crosshairEnabled: true
 
-    // --- Offset line mode (see specs/offset-line-mode.md) ---
-    // When active: lines/ticks at cursor - (offsetX, offsetY) so they sit on a
-    // window border rather than the grab point under the cursor.
-    property bool offsetModeActive: false
-    property real offsetX: 0
-    property real offsetY: 0
+    // Primary crosshair stays on the cursor.
+    readonly property real linePosX: Workspace.cursorPos.x
+    readonly property real linePosY: Workspace.cursorPos.y
+
+    // --- Secondary offset guides (specs/offset-line-mode.md v2) ---
+    // Each axis: enable + offset(px from cursor) + color. Independent of primary.
+    property bool offsetVerticalEnabled: false
+    property int offsetVerticalOffset: 100
+    property int offsetVerticalColorR: 0
+    property int offsetVerticalColorG: 255
+    property int offsetVerticalColorB: 255
+    property color offsetVerticalColor: Qt.rgba(0, 1, 1, 1)
+
+    property bool offsetHorizontalEnabled: false
+    property int offsetHorizontalOffset: 100
+    property int offsetHorizontalColorR: 0
+    property int offsetHorizontalColorG: 255
+    property int offsetHorizontalColorB: 0
+    property color offsetHorizontalColor: Qt.rgba(0, 1, 0, 1)
+
     property bool autoOffsetOnMove: true
     property var offsetTrackWindow: null
 
-    readonly property real linePosX: Workspace.cursorPos.x
-        - (root.offsetModeActive ? root.offsetX : 0)
-    readonly property real linePosY: Workspace.cursorPos.y
-        - (root.offsetModeActive ? root.offsetY : 0)
+    readonly property real offsetVerticalPosX: root.linePosX + root.offsetVerticalOffset
+    readonly property real offsetHorizontalPosY: root.linePosY + root.offsetHorizontalOffset
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
@@ -120,27 +134,32 @@ Window {
         + "            return int(a),int(b),int(c)\n"
         + "        except: return None\n"
         + "    return None\n"
-        + "leg=kr('LineColor','')\n"
-        + "R,Gg,B=kr('LineColorR',''),kr('LineColorG',''),kr('LineColorB','')\n"
-        + "rgb=parse_color(leg)\n"
-        + "if rgb is None and R!='':\n"
-        + "    try: rgb=(max(0,min(255,int(float(R)))),max(0,min(255,int(float(Gg or 0)))),max(0,min(255,int(float(B or 0)))))\n"
-        + "    except: rgb=None\n"
-        + "if rgb is None: rgb=(255,0,0)\n"
-        + "r,g,b=rgb\n"
-        + "kw('LineColorR',r); kw('LineColorG',g); kw('LineColorB',b)\n"
-        + "# Keep Color key populated so KColorButton reloads the saved tint\n"
-        + "kw('LineColor','%d,%d,%d'%(r,g,b))\n"
-        + "print('LineColor=%d,%d,%d'%(r,g,b))\n"
-        + "print('LineColorR='+str(r))\n"
-        + "print('LineColorG='+str(g))\n"
-        + "print('LineColorB='+str(b))\n"
+        + "def sync_color(name, dr, dg, db):\n"
+        + "    leg=kr(name,'')\n"
+        + "    R,Gg,B=kr(name+'R',''),kr(name+'G',''),kr(name+'B','')\n"
+        + "    rgb=parse_color(leg)\n"
+        + "    if rgb is None and R!='':\n"
+        + "        try: rgb=(max(0,min(255,int(float(R)))),max(0,min(255,int(float(Gg or 0)))),max(0,min(255,int(float(B or 0)))))\n"
+        + "        except: rgb=None\n"
+        + "    if rgb is None: rgb=(dr,dg,db)\n"
+        + "    r,g,b=rgb\n"
+        + "    kw(name+'R',r); kw(name+'G',g); kw(name+'B',b)\n"
+        + "    kw(name,'%d,%d,%d'%(r,g,b))\n"
+        + "    print(name+'=%d,%d,%d'%(r,g,b))\n"
+        + "    print(name+'R='+str(r)); print(name+'G='+str(g)); print(name+'B='+str(b))\n"
+        + "sync_color('LineColor',255,0,0)\n"
+        + "sync_color('OffsetVerticalColor',0,255,255)\n"
+        + "sync_color('OffsetHorizontalColor',0,255,0)\n"
         + "print('LineWidth='+kr('LineWidth','1'))\n"
         + "print('Opacity='+kr('Opacity','0.8'))\n"
         + "print('ShowInchTicks='+kr('ShowInchTicks','true'))\n"
         + "print('ScreenDiagonalInches='+kr('ScreenDiagonalInches','27.0'))\n"
         + "print('TickLength='+kr('TickLength','10'))\n"
         + "print('ShowHalfInchTicks='+kr('ShowHalfInchTicks','true'))\n"
+        + "print('OffsetVerticalEnabled='+kr('OffsetVerticalEnabled','false'))\n"
+        + "print('OffsetVerticalOffset='+kr('OffsetVerticalOffset','100'))\n"
+        + "print('OffsetHorizontalEnabled='+kr('OffsetHorizontalEnabled','false'))\n"
+        + "print('OffsetHorizontalOffset='+kr('OffsetHorizontalOffset','100'))\n"
         + "print('AutoOffsetOnMove='+kr('AutoOffsetOnMove','true'))\n"
         + "PY"
 
@@ -291,12 +310,39 @@ Window {
         root.lineColorR = r;
         root.lineColorG = g;
         root.lineColorB = b;
-        // Always rebuild the QML color (avoids black-stuck after re-enable).
         root.lineColor = root.rgbaBytes(r, g, b, 255);
         if (prev !== next) {
             console.log("InfiniteCrosshair LineColor", prev, "->", next,
                         "src=", sourceTag || "n/a");
         }
+    }
+
+    function setOffsetVerticalColorRgb(r, g, b, sourceTag) {
+        r = root.parseIntClamped(r, 0, 0, 255);
+        g = root.parseIntClamped(g, 255, 0, 255);
+        b = root.parseIntClamped(b, 255, 0, 255);
+        const prev = root.offsetVerticalColorR + "," + root.offsetVerticalColorG + "," + root.offsetVerticalColorB;
+        const next = r + "," + g + "," + b;
+        root.offsetVerticalColorR = r;
+        root.offsetVerticalColorG = g;
+        root.offsetVerticalColorB = b;
+        root.offsetVerticalColor = root.rgbaBytes(r, g, b, 255);
+        if (prev !== next)
+            console.log("InfiniteCrosshair OffsetVerticalColor", prev, "->", next, "src=", sourceTag || "n/a");
+    }
+
+    function setOffsetHorizontalColorRgb(r, g, b, sourceTag) {
+        r = root.parseIntClamped(r, 0, 0, 255);
+        g = root.parseIntClamped(g, 255, 0, 255);
+        b = root.parseIntClamped(b, 0, 0, 255);
+        const prev = root.offsetHorizontalColorR + "," + root.offsetHorizontalColorG + "," + root.offsetHorizontalColorB;
+        const next = r + "," + g + "," + b;
+        root.offsetHorizontalColorR = r;
+        root.offsetHorizontalColorG = g;
+        root.offsetHorizontalColorB = b;
+        root.offsetHorizontalColor = root.rgbaBytes(r, g, b, 255);
+        if (prev !== next)
+            console.log("InfiniteCrosshair OffsetHorizontalColor", prev, "->", next, "src=", sourceTag || "n/a");
     }
 
     function applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, sourceTag) {
@@ -358,6 +404,52 @@ Window {
                 autoOffsetOnMove = ao;
             }
         }
+
+        if (map.OffsetVerticalEnabled !== undefined) {
+            const en = root.parseBool(map.OffsetVerticalEnabled, false);
+            if (offsetVerticalEnabled !== en)
+                offsetVerticalEnabled = en;
+        }
+        if (map.OffsetVerticalOffset !== undefined) {
+            const off = root.parseIntClamped(map.OffsetVerticalOffset, 100, -4000, 4000);
+            if (offsetVerticalOffset !== off)
+                offsetVerticalOffset = off;
+        }
+        if (map.OffsetVerticalColorR !== undefined || map.OffsetVerticalColor !== undefined) {
+            let vr = 0, vg = 255, vb = 255;
+            if (map.OffsetVerticalColorR !== undefined && String(map.OffsetVerticalColorR).length > 0) {
+                vr = root.parseIntClamped(map.OffsetVerticalColorR, 0, 0, 255);
+                vg = root.parseIntClamped(map.OffsetVerticalColorG, 255, 0, 255);
+                vb = root.parseIntClamped(map.OffsetVerticalColorB, 255, 0, 255);
+            } else if (map.OffsetVerticalColor !== undefined) {
+                const c = root.parseColor(map.OffsetVerticalColor, Qt.rgba(0, 1, 1, 1));
+                vr = Math.round(c.r * 255); vg = Math.round(c.g * 255); vb = Math.round(c.b * 255);
+            }
+            root.setOffsetVerticalColorRgb(vr, vg, vb, sourceTag || "map");
+        }
+
+        if (map.OffsetHorizontalEnabled !== undefined) {
+            const en = root.parseBool(map.OffsetHorizontalEnabled, false);
+            if (offsetHorizontalEnabled !== en)
+                offsetHorizontalEnabled = en;
+        }
+        if (map.OffsetHorizontalOffset !== undefined) {
+            const off = root.parseIntClamped(map.OffsetHorizontalOffset, 100, -4000, 4000);
+            if (offsetHorizontalOffset !== off)
+                offsetHorizontalOffset = off;
+        }
+        if (map.OffsetHorizontalColorR !== undefined || map.OffsetHorizontalColor !== undefined) {
+            let hr = 0, hg = 255, hb = 0;
+            if (map.OffsetHorizontalColorR !== undefined && String(map.OffsetHorizontalColorR).length > 0) {
+                hr = root.parseIntClamped(map.OffsetHorizontalColorR, 0, 0, 255);
+                hg = root.parseIntClamped(map.OffsetHorizontalColorG, 255, 0, 255);
+                hb = root.parseIntClamped(map.OffsetHorizontalColorB, 0, 0, 255);
+            } else if (map.OffsetHorizontalColor !== undefined) {
+                const c = root.parseColor(map.OffsetHorizontalColor, Qt.rgba(0, 1, 0, 1));
+                hr = Math.round(c.r * 255); hg = Math.round(c.g * 255); hb = Math.round(c.b * 255);
+            }
+            root.setOffsetHorizontalColorRgb(hr, hg, hb, sourceTag || "map");
+        }
     }
 
     function applyConfigLines(stdout, sourceTag) {
@@ -373,8 +465,12 @@ Window {
         let keyed = 0;
         const keys = {
             "LineColorR": 1, "LineColorG": 1, "LineColorB": 1, "LineColor": 1,
+            "OffsetVerticalColorR": 1, "OffsetVerticalColorG": 1, "OffsetVerticalColorB": 1, "OffsetVerticalColor": 1,
+            "OffsetHorizontalColorR": 1, "OffsetHorizontalColorG": 1, "OffsetHorizontalColorB": 1, "OffsetHorizontalColor": 1,
             "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1,
             "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
+            "OffsetVerticalEnabled": 1, "OffsetVerticalOffset": 1,
+            "OffsetHorizontalEnabled": 1, "OffsetHorizontalOffset": 1,
             "AutoOffsetOnMove": 1
         };
         for (let i = 0; i < rawLines.length; ++i) {
@@ -416,8 +512,34 @@ Window {
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
         root.autoOffsetOnMove = root.parseBool(KWin.readConfig("AutoOffsetOnMove", true), true);
+        root.offsetVerticalEnabled = root.parseBool(KWin.readConfig("OffsetVerticalEnabled", false), false);
+        root.offsetVerticalOffset = root.parseIntClamped(KWin.readConfig("OffsetVerticalOffset", 100), 100, -4000, 4000);
+        root.offsetHorizontalEnabled = root.parseBool(KWin.readConfig("OffsetHorizontalEnabled", false), false);
+        root.offsetHorizontalOffset = root.parseIntClamped(KWin.readConfig("OffsetHorizontalOffset", 100), 100, -4000, 4000);
+        {
+            let vr = root.parseIntClamped(KWin.readConfig("OffsetVerticalColorR", -1), -1, -1, 255);
+            let vg = root.parseIntClamped(KWin.readConfig("OffsetVerticalColorG", -1), -1, -1, 255);
+            let vb = root.parseIntClamped(KWin.readConfig("OffsetVerticalColorB", -1), -1, -1, 255);
+            if (vr < 0 || vg < 0 || vb < 0) {
+                const c = root.parseColor(KWin.readConfig("OffsetVerticalColor", "#00FFFF"), Qt.rgba(0, 1, 1, 1));
+                vr = Math.round(c.r * 255); vg = Math.round(c.g * 255); vb = Math.round(c.b * 255);
+            }
+            root.setOffsetVerticalColorRgb(vr, vg, vb, "seed");
+        }
+        {
+            let hr = root.parseIntClamped(KWin.readConfig("OffsetHorizontalColorR", -1), -1, -1, 255);
+            let hg = root.parseIntClamped(KWin.readConfig("OffsetHorizontalColorG", -1), -1, -1, 255);
+            let hb = root.parseIntClamped(KWin.readConfig("OffsetHorizontalColorB", -1), -1, -1, 255);
+            if (hr < 0 || hg < 0 || hb < 0) {
+                const c = root.parseColor(KWin.readConfig("OffsetHorizontalColor", "#00FF00"), Qt.rgba(0, 1, 0, 1));
+                hr = Math.round(c.r * 255); hg = Math.round(c.g * 255); hb = Math.round(c.b * 255);
+            }
+            root.setOffsetHorizontalColorRgb(hr, hg, hb, "seed");
+        }
         console.log("InfiniteCrosshair seed rgb=", r, g, b,
                     "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen,
+                    "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,
+                    "offH=", root.offsetHorizontalEnabled, root.offsetHorizontalOffset,
                     "autoOffset=", root.autoOffsetOnMove,
                     "build=", root.buildId);
         applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, "seed");
@@ -619,7 +741,8 @@ Window {
         return null;
     }
 
-    // Nearest vertical edge → offsetX; nearest horizontal edge → offsetY.
+    // Nearest L/R → vertical guide offset; nearest T/B → horizontal guide offset.
+    // offset = edge - cursor so (cursor + offset) sits on the edge.
     function setOffsetFromFrame(g, sourceTag) {
         if (!g)
             return false;
@@ -630,12 +753,13 @@ Window {
         const bottom = g.y + g.height;
         const edgeX = (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
         const edgeY = (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
-        root.offsetX = pos.x - edgeX;
-        root.offsetY = pos.y - edgeY;
-        root.offsetModeActive = true;
-        console.log("InfiniteCrosshair offset set",
-                    "ox=", root.offsetX.toFixed(1), "oy=", root.offsetY.toFixed(1),
-                    "edge=", edgeX.toFixed(0) + "," + edgeY.toFixed(0),
+        root.offsetVerticalOffset = Math.round(edgeX - pos.x);
+        root.offsetHorizontalOffset = Math.round(edgeY - pos.y);
+        root.offsetVerticalEnabled = true;
+        root.offsetHorizontalEnabled = true;
+        console.log("InfiniteCrosshair guide offsets",
+                    "v=", root.offsetVerticalOffset, "h=", root.offsetHorizontalOffset,
+                    "edge=", Math.round(edgeX) + "," + Math.round(edgeY),
                     "src=", sourceTag || "n/a");
         return true;
     }
@@ -643,29 +767,35 @@ Window {
     function captureBorderOffset() {
         const w = root.windowUnderCursor();
         if (!w) {
-            console.log("InfiniteCrosshair capture offset: no window under cursor");
+            console.log("InfiniteCrosshair capture: no window under cursor");
             return;
         }
         const g = root.windowFrameGeometry(w);
         if (!root.setOffsetFromFrame(g, "capture"))
-            console.log("InfiniteCrosshair capture offset: no geometry");
+            console.log("InfiniteCrosshair capture: no geometry");
     }
 
-    function clearOffset() {
-        root.offsetX = 0;
-        root.offsetY = 0;
-        root.offsetModeActive = false;
+    function clearOffsetGuides() {
+        root.offsetVerticalEnabled = false;
+        root.offsetHorizontalEnabled = false;
+        root.offsetVerticalOffset = 0;
+        root.offsetHorizontalOffset = 0;
         root.offsetTrackWindow = null;
-        console.log("InfiniteCrosshair offset cleared");
+        console.log("InfiniteCrosshair offset guides cleared");
     }
 
-    function toggleOffsetMode() {
-        root.offsetModeActive = !root.offsetModeActive;
-        if (!root.offsetModeActive)
-            root.offsetTrackWindow = null;
-        console.log("InfiniteCrosshair offset mode",
-                    root.offsetModeActive ? "ON" : "OFF",
-                    "ox=", root.offsetX.toFixed(1), "oy=", root.offsetY.toFixed(1));
+    function toggleOffsetVertical() {
+        root.offsetVerticalEnabled = !root.offsetVerticalEnabled;
+        console.log("InfiniteCrosshair offset vertical",
+                    root.offsetVerticalEnabled ? "ON" : "OFF",
+                    "off=", root.offsetVerticalOffset);
+    }
+
+    function toggleOffsetHorizontal() {
+        root.offsetHorizontalEnabled = !root.offsetHorizontalEnabled;
+        console.log("InfiniteCrosshair offset horizontal",
+                    root.offsetHorizontalEnabled ? "ON" : "OFF",
+                    "off=", root.offsetHorizontalOffset);
     }
 
     function refreshOffsetFromTrackedWindow() {
@@ -718,7 +848,7 @@ Window {
             root.hookWindowMoveResize(list[i]);
     }
 
-    // Vertical line
+    // Primary vertical (cursor)
     Rectangle {
         visible: root.crosshairEnabled
         x: root.linePosX - Math.max(1, root.lineWidth) / 2
@@ -730,7 +860,7 @@ Window {
         z: 9999
     }
 
-    // Horizontal line
+    // Primary horizontal (cursor)
     Rectangle {
         visible: root.crosshairEnabled
         x: 0
@@ -740,6 +870,30 @@ Window {
         color: root.lineColor
         opacity: root.lineOpacity
         z: 9999
+    }
+
+    // Second vertical guide (offset from cursor)
+    Rectangle {
+        visible: root.crosshairEnabled && root.offsetVerticalEnabled
+        x: root.offsetVerticalPosX - Math.max(1, root.lineWidth) / 2
+        y: 0
+        width: Math.max(1, root.lineWidth)
+        height: parent.height
+        color: root.offsetVerticalColor
+        opacity: root.lineOpacity
+        z: 9998
+    }
+
+    // Second horizontal guide (offset from cursor)
+    Rectangle {
+        visible: root.crosshairEnabled && root.offsetHorizontalEnabled
+        x: 0
+        y: root.offsetHorizontalPosY - Math.max(1, root.lineWidth) / 2
+        width: parent.width
+        height: Math.max(1, root.lineWidth)
+        color: root.offsetHorizontalColor
+        opacity: root.lineOpacity
+        z: 9998
     }
 
     // Inch ticks (defaults ON; independent of config poller success)
@@ -802,10 +956,17 @@ Window {
     }
 
     ShortcutHandler {
-        name: root.offsetModeShortcutName
-        text: root.offsetModeShortcutName
-        sequence: root.offsetModeShortcutDefault
-        onActivated: root.toggleOffsetMode()
+        name: root.toggleOffsetVShortcutName
+        text: root.toggleOffsetVShortcutName
+        sequence: root.toggleOffsetVShortcutDefault
+        onActivated: root.toggleOffsetVertical()
+    }
+
+    ShortcutHandler {
+        name: root.toggleOffsetHShortcutName
+        text: root.toggleOffsetHShortcutName
+        sequence: root.toggleOffsetHShortcutDefault
+        onActivated: root.toggleOffsetHorizontal()
     }
 
     ShortcutHandler {
@@ -819,7 +980,7 @@ Window {
         name: root.clearOffsetShortcutName
         text: root.clearOffsetShortcutName
         sequence: root.clearOffsetShortcutDefault
-        onActivated: root.clearOffset()
+        onActivated: root.clearOffsetGuides()
     }
 
     Component.onCompleted: {
@@ -843,9 +1004,12 @@ Window {
                     "ppi=", root.pixelsPerInch.toFixed(2),
                     "tickStep=", root.tickStepPx.toFixed(2),
                     "autoOffset=", root.autoOffsetOnMove,
+                    "offV=", root.offsetVerticalEnabled, root.offsetVerticalOffset,
+                    "offH=", root.offsetHorizontalEnabled, root.offsetHorizontalOffset,
                     "enabled=", root.crosshairEnabled,
                     "toggle=", root.toggleShortcutDefault,
-                    "offsetMode=", root.offsetModeShortcutDefault,
+                    "capV=", root.toggleOffsetVShortcutDefault,
+                    "capH=", root.toggleOffsetHShortcutDefault,
                     "capture=", root.captureOffsetShortcutDefault);
     }
 

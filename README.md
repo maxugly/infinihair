@@ -13,8 +13,8 @@ A **zero-latency**, full-screen crosshair overlay for KDE Plasma. Renders precis
 *   **🚀 Zero Latency:** Native KWin compositor integration — direct `Workspace.cursorPos` binding (no cursor polling).  
 *   **🖥️ Multi-Monitor Ready:** Lines span the virtual desktop (`Workspace.virtualScreenSize`).  
 *   **🎨 Fully Customizable:** Color (picker), thickness, opacity, inch ticks / PPI via System Settings.  
-*   **⌨️ Shortcuts:** **Meta+Shift+X** toggle · **Meta+Shift+O** offset mode · **Meta+Shift+B** capture border · **Meta+Shift+C** clear offset (rebind under Keyboard → Shortcuts → KWin).  
-*   **📐 Offset line mode:** Shift lines to the nearest window frame edges while aligning/moving (grab offset, not cursor center).  
+*   **⌨️ Shortcuts:** **Meta+Shift+X** toggle · **Meta+Shift+V/H** second V/H guides · **Meta+Shift+B** capture border offsets · **Meta+Shift+C** clear guides.  
+*   **📐 Offset guides:** Extra vertical/horizontal lines with independent enable, px offset from cursor, and color (for border alignment while the primary stays on the cursor).  
 *   **🌍 Global Overlay:** Full-screen transparent window above other surfaces; input-through so clicks pass through.  
 *   **⚡ Lightweight:** Simple `Rectangle` scene-graph primitives.
 

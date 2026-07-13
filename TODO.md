@@ -10,8 +10,8 @@
 | Disable / re-enable in KWin Scripts | **PASS (Max)** |
 | Color picker + live apply | **PASS (Max)** |
 | Multi Configure dialogs | **Upstream KWin** — wontfix in-package (documented) |
-| Offset line mode v1 | **Shipped** — Max smoke |
-| buildId | `2026-07-13-offset1` |
+| Offset guides v2 (2nd V/H + offset + color) | **Shipped offset2** — Max smoke |
+| buildId | `2026-07-13-offset2` |
 
 ---
 

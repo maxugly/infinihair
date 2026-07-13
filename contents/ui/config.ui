@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>460</width>
-    <height>420</height>
+    <width>480</width>
+    <height>620</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,39 +17,13 @@
    <item row="0" column="0" colspan="2">
     <widget class="QGroupBox" name="groupShortcut">
      <property name="title">
-      <string>Keyboard shortcut</string>
+      <string>Keyboard shortcuts</string>
      </property>
      <layout class="QVBoxLayout" name="shortcutLayout">
       <item>
-       <widget class="QLabel" name="labelShortcutAction">
-        <property name="text">
-         <string>&lt;b&gt;Toggle crosshair&lt;/b&gt; — action name: &lt;i&gt;Infinite Crosshair: Toggle&lt;/i&gt;</string>
-        </property>
-        <property name="textFormat">
-         <enum>Qt::RichText</enum>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="labelShortcutDefault">
-        <property name="text">
-         <string>Default binding: &lt;b&gt;Meta+Shift+X&lt;/b&gt; (Super+Shift+X)</string>
-        </property>
-        <property name="textFormat">
-         <enum>Qt::RichText</enum>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QLabel" name="labelShortcutHowTo">
         <property name="text">
-         <string>Defaults: &lt;b&gt;Meta+Shift+X&lt;/b&gt; toggle visibility · &lt;b&gt;Meta+Shift+O&lt;/b&gt; offset mode · &lt;b&gt;Meta+Shift+B&lt;/b&gt; capture nearest window border under cursor · &lt;b&gt;Meta+Shift+C&lt;/b&gt; clear offset. Rebind: &lt;b&gt;System Settings → Keyboard → Shortcuts&lt;/b&gt;, search &lt;i&gt;Infinite Crosshair&lt;/i&gt;.</string>
+         <string>&lt;b&gt;Meta+Shift+X&lt;/b&gt; toggle crosshair · &lt;b&gt;Meta+Shift+V&lt;/b&gt; second vertical · &lt;b&gt;Meta+Shift+H&lt;/b&gt; second horizontal · &lt;b&gt;Meta+Shift+B&lt;/b&gt; capture border offsets · &lt;b&gt;Meta+Shift+C&lt;/b&gt; clear guides. Rebind: System Settings → Keyboard → Shortcuts → &lt;i&gt;Infinite Crosshair&lt;/i&gt;.</string>
         </property>
         <property name="textFormat">
          <enum>Qt::RichText</enum>
@@ -65,7 +39,7 @@
    <item row="1" column="0">
     <widget class="QLabel" name="labelLineColor">
      <property name="text">
-      <string>Line color</string>
+      <string>Primary color</string>
      </property>
      <property name="buddy">
       <cstring>kcfg_LineColor</cstring>
@@ -75,7 +49,7 @@
    <item row="1" column="1">
     <widget class="KColorButton" name="kcfg_LineColor">
      <property name="toolTip">
-      <string>Crosshair line color</string>
+      <string>Main crosshair color (cursor-centered)</string>
      </property>
      <property name="color">
       <color>
@@ -141,7 +115,176 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0">
+   <item row="4" column="0" colspan="2">
+    <widget class="QGroupBox" name="groupOffsetVertical">
+     <property name="title">
+      <string>Second vertical guide</string>
+     </property>
+     <layout class="QFormLayout" name="formOffsetV">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelOffsetVerticalEnabled">
+        <property name="text">
+         <string>Enabled</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QCheckBox" name="kcfg_OffsetVerticalEnabled">
+        <property name="text">
+         <string>Show second vertical line</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelOffsetVerticalOffset">
+        <property name="text">
+         <string>Offset</string>
+        </property>
+        <property name="buddy">
+         <cstring>kcfg_OffsetVerticalOffset</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="kcfg_OffsetVerticalOffset">
+        <property name="toolTip">
+         <string>Pixels from cursor. Negative = left of cursor.</string>
+        </property>
+        <property name="minimum">
+         <number>-4000</number>
+        </property>
+        <property name="maximum">
+         <number>4000</number>
+        </property>
+        <property name="value">
+         <number>100</number>
+        </property>
+        <property name="suffix">
+         <string> px</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="labelOffsetVerticalColor">
+        <property name="text">
+         <string>Color</string>
+        </property>
+        <property name="buddy">
+         <cstring>kcfg_OffsetVerticalColor</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="KColorButton" name="kcfg_OffsetVerticalColor">
+        <property name="color">
+         <color>
+          <red>0</red>
+          <green>255</green>
+          <blue>255</blue>
+         </color>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="5" column="0" colspan="2">
+    <widget class="QGroupBox" name="groupOffsetHorizontal">
+     <property name="title">
+      <string>Second horizontal guide</string>
+     </property>
+     <layout class="QFormLayout" name="formOffsetH">
+      <item row="0" column="0">
+       <widget class="QLabel" name="labelOffsetHorizontalEnabled">
+        <property name="text">
+         <string>Enabled</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QCheckBox" name="kcfg_OffsetHorizontalEnabled">
+        <property name="text">
+         <string>Show second horizontal line</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelOffsetHorizontalOffset">
+        <property name="text">
+         <string>Offset</string>
+        </property>
+        <property name="buddy">
+         <cstring>kcfg_OffsetHorizontalOffset</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="kcfg_OffsetHorizontalOffset">
+        <property name="toolTip">
+         <string>Pixels from cursor. Negative = above cursor.</string>
+        </property>
+        <property name="minimum">
+         <number>-4000</number>
+        </property>
+        <property name="maximum">
+         <number>4000</number>
+        </property>
+        <property name="value">
+         <number>100</number>
+        </property>
+        <property name="suffix">
+         <string> px</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="labelOffsetHorizontalColor">
+        <property name="text">
+         <string>Color</string>
+        </property>
+        <property name="buddy">
+         <cstring>kcfg_OffsetHorizontalColor</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="KColorButton" name="kcfg_OffsetHorizontalColor">
+        <property name="color">
+         <color>
+          <red>0</red>
+          <green>255</green>
+          <blue>0</blue>
+         </color>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="labelAutoOffsetOnMove">
+     <property name="text">
+      <string>On move</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_AutoOffsetOnMove</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="1">
+    <widget class="QCheckBox" name="kcfg_AutoOffsetOnMove">
+     <property name="toolTip">
+      <string>While moving/resizing a window, set both guide offsets to the nearest frame edges and enable them.</string>
+     </property>
+     <property name="text">
+      <string>Auto-set guide offsets from window borders while moving/resizing</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0">
     <widget class="QLabel" name="labelShowInchTicks">
      <property name="text">
       <string>Show inch ticks</string>
@@ -151,17 +294,17 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="1">
+   <item row="7" column="1">
     <widget class="QCheckBox" name="kcfg_ShowInchTicks">
      <property name="text">
-      <string>Tick marks every inch on the crosshair</string>
+      <string>Tick marks every inch on the primary crosshair</string>
      </property>
      <property name="checked">
       <bool>true</bool>
      </property>
     </widget>
    </item>
-   <item row="5" column="0">
+   <item row="8" column="0">
     <widget class="QLabel" name="labelScreenDiagonal">
      <property name="text">
       <string>Screen diagonal</string>
@@ -171,10 +314,10 @@
      </property>
     </widget>
    </item>
-   <item row="5" column="1">
+   <item row="8" column="1">
     <widget class="QDoubleSpinBox" name="kcfg_ScreenDiagonalInches">
      <property name="toolTip">
-      <string>Physical diagonal size of your monitor (e.g. 27 for a 27&quot; display). Combined with the detected resolution of the screen under the cursor to compute pixels-per-inch.</string>
+      <string>Physical diagonal size of your monitor (e.g. 27 for a 27&quot; display).</string>
      </property>
      <property name="decimals">
       <number>1</number>
@@ -196,7 +339,7 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="0">
+   <item row="9" column="0">
     <widget class="QLabel" name="labelTickLength">
      <property name="text">
       <string>Tick length</string>
@@ -206,7 +349,7 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="1">
+   <item row="9" column="1">
     <widget class="QSpinBox" name="kcfg_TickLength">
      <property name="minimum">
       <number>2</number>
@@ -222,7 +365,7 @@
      </property>
     </widget>
    </item>
-   <item row="7" column="0">
+   <item row="10" column="0">
     <widget class="QLabel" name="labelShowHalfInchTicks">
      <property name="text">
       <string>Half-inch ticks</string>
@@ -232,33 +375,10 @@
      </property>
     </widget>
    </item>
-   <item row="7" column="1">
+   <item row="10" column="1">
     <widget class="QCheckBox" name="kcfg_ShowHalfInchTicks">
      <property name="text">
       <string>Shorter marks every ½ inch</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="0">
-    <widget class="QLabel" name="labelAutoOffsetOnMove">
-     <property name="text">
-      <string>Offset on move</string>
-     </property>
-     <property name="buddy">
-      <cstring>kcfg_AutoOffsetOnMove</cstring>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="1">
-    <widget class="QCheckBox" name="kcfg_AutoOffsetOnMove">
-     <property name="toolTip">
-      <string>While you move or resize a window, shift the crosshair so the lines sit on the nearest frame edges (grab offset), not under the cursor.</string>
-     </property>
-     <property name="text">
-      <string>Auto-align crosshair to window borders while moving/resizing</string>
      </property>
      <property name="checked">
       <bool>true</bool>

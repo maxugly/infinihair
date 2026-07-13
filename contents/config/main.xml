@@ -6,13 +6,12 @@
   <kcfgfile name=""/>
   <group name="">
     <!--
-      Frontend: KColorButton (kcfg_LineColor) in contents/ui/config.ui.
-      On-disk: KConfig Color key LineColor (typically R,G,B in kwinrc).
-      Runtime also mirrors LineColorR/G/B ints (not shown in UI) so re-enable
-      and the disk poller stay robust if the Color key is missing/stale.
+      Primary crosshair: LineColor + width/opacity/ticks.
+      Secondary offset guides: each axis has enable + offset(px) + color.
+      Color keys use KColorButton; R/G/B mirrors written by the disk poller.
     -->
     <entry name="LineColor" type="Color">
-      <label>Line color</label>
+      <label>Primary line color</label>
       <default>#FF0000</default>
     </entry>
     <entry name="LineWidth" type="Int">
@@ -43,8 +42,39 @@
     <entry name="ShowHalfInchTicks" type="Bool">
       <default>true</default>
     </entry>
+
+    <entry name="OffsetVerticalEnabled" type="Bool">
+      <label>Show second vertical guide</label>
+      <default>false</default>
+    </entry>
+    <entry name="OffsetVerticalOffset" type="Int">
+      <label>Second vertical offset from cursor (px; negative = left)</label>
+      <default>100</default>
+      <min>-4000</min>
+      <max>4000</max>
+    </entry>
+    <entry name="OffsetVerticalColor" type="Color">
+      <label>Second vertical line color</label>
+      <default>#00FFFF</default>
+    </entry>
+
+    <entry name="OffsetHorizontalEnabled" type="Bool">
+      <label>Show second horizontal guide</label>
+      <default>false</default>
+    </entry>
+    <entry name="OffsetHorizontalOffset" type="Int">
+      <label>Second horizontal offset from cursor (px; negative = up)</label>
+      <default>100</default>
+      <min>-4000</min>
+      <max>4000</max>
+    </entry>
+    <entry name="OffsetHorizontalColor" type="Color">
+      <label>Second horizontal line color</label>
+      <default>#00FF00</default>
+    </entry>
+
     <entry name="AutoOffsetOnMove" type="Bool">
-      <label>While moving or resizing a window, offset the crosshair to the nearest frame edges</label>
+      <label>While moving or resizing a window, set guide offsets to nearest frame edges</label>
       <default>true</default>
     </entry>
   </group>

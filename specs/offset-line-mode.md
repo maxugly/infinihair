@@ -1,62 +1,61 @@
-# Feature: Offset line mode
+# Feature: Offset guide lines (secondary V/H)
 
-**Status:** Implemented (v1)  
-**buildId:** `2026-07-13-offset1`  
-**Owner implementer:** Grok (Max-directed)
+**Status:** Implemented (v2 — Max-corrected model)  
+**buildId:** `2026-07-13-offset2`
 
-## Goal
+## Product model (Max)
 
-Shift the crosshair from the raw cursor so the **vertical/horizontal lines sit on the border** of the window (or object) you are aligning or moving — not through the grab point under the finger/cursor.
+Not “shift the whole crosshair.” Instead:
 
-## Why
+1. **Primary** vertical + horizontal stay on the **cursor** (main color / width / opacity).
+2. **Second vertical** guide: on/off, **offset** (px from cursor), **own color**.
+3. **Second horizontal** guide: on/off, **offset** (px from cursor), **own color**.
 
-When you drag a window by the title bar (or an app by an interior handle), the cursor is **not** on the edge you care about. Guides through the cursor miss the edge by that grab offset. Offset mode subtracts that delta so lines track the **nearest frame edges**.
+Use case: keep the main crosshair on the grab/cursor while a second pair of guides sits on the **border** you are aligning (window edge, selection edge, etc.).
 
-## Behavior
-
-| action | shortcut (default) | effect |
-|---|---|---|
-| Toggle offset mode | **Meta+Shift+O** | On/off. When on, lines at `cursor - (offsetX, offsetY)`. |
-| Capture border under cursor | **Meta+Shift+B** | Window under cursor → nearest L/R + T/B edges → set offset; mode ON. |
-| Clear offset | **Meta+Shift+C** | offset → 0; mode OFF. |
-| Auto while move/resize | config **Auto offset on move** (default on) | On interactive move/resize, continuously recompute offset from that window’s frame so lines stick to nearest edges. |
-
-### Math
+## Math
 
 ```
-lineX = cursorPos.x - offsetX
-lineY = cursorPos.y - offsetY
-// when capturing from frameGeometry g:
-// offsetX = cursor.x - nearest(g.x, g.x+g.width)
-// offsetY = cursor.y - nearest(g.y, g.y+g.height)
+primaryX = cursor.x
+primaryY = cursor.y
+offsetVerticalX   = cursor.x + OffsetVerticalOffset     // px; negative = left of cursor
+offsetHorizontalY = cursor.y + OffsetHorizontalOffset // negative = above cursor
 ```
 
-Ticks follow the same origin as the lines.
+## Config (`main.xml` + `config.ui`)
 
-### Constraints
+| key | type | default | UI |
+|---|---|---|---|
+| `OffsetVerticalEnabled` | Bool | false | checkbox |
+| `OffsetVerticalOffset` | Int | 100 | spinbox (−4000…4000 px) |
+| `OffsetVerticalColor` | Color | `#00FFFF` | KColorButton |
+| `OffsetHorizontalEnabled` | Bool | false | checkbox |
+| `OffsetHorizontalOffset` | Int | 100 | spinbox |
+| `OffsetHorizontalColor` | Color | `#00FF00` | KColorButton |
+| `AutoOffsetOnMove` | Bool | true | while move/resize, set offsets from nearest frame edges + enable both guides |
 
-- Overlay stays `WindowTransparentForInput` (no click-to-capture on the overlay itself) — use shortcuts.
-- Skip our own overlay client when picking windows.
-- Prefer `frameGeometry` when available, else `geometry`.
-- No cursor-position Timer; offsets update on shortcut, move/resize signals, or existing cursor-driven bindings.
+Disk also mirrors `OffsetVerticalColorR/G/B` and `OffsetHorizontalColorR/G/B` (like primary) for re-enable robustness — not shown in UI.
 
-## Config
+## Shortcuts (defaults)
 
-| key | type | default |
-|---|---|---|
-| `AutoOffsetOnMove` | Bool | `true` |
+| shortcut | action |
+|---|---|
+| **Meta+Shift+V** | Toggle second vertical guide |
+| **Meta+Shift+H** | Toggle second horizontal guide |
+| **Meta+Shift+B** | Capture: nearest window edges under cursor → set both offsets + enable both |
+| **Meta+Shift+C** | Clear: disable both guides, offsets → 0 |
 
-Offset mode itself is runtime (shortcuts); optional sticky offsets are not written to kwinrc in v1.
+## Auto on move
 
-## Out of scope (later)
+When `AutoOffsetOnMove` and the user interactively moves/resizes a window: recompute offsets so the secondary lines sit on the nearest L/R and T/B **frame** edges of that window; enable both guides.
 
-- Click-to-capture without shortcut (would need input-through off briefly)
-- Multi-window / screen edge only
-- Persistent saved offset in config
+## Out of scope
 
-## Exit criteria
+- More than one extra V or H
+- Ticks on secondary lines (ticks stay on primary origin)
+- Click-to-capture without shortcut (overlay is input-through)
 
-- [x] Spec written  
-- [ ] package + check  
-- [ ] Max: capture on a window edge, drag window, lines ride the border  
-- [ ] Max: Meta+Shift+O off restores cursor-centered crosshair  
+## History
+
+- v1 (`offset1`): shifted the whole crosshair — wrong product shape.  
+- v2 (`offset2`): secondary guides per Max.  

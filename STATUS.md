@@ -3,7 +3,7 @@
 **Date:** 2026-07-13  
 **Repo:** `~/.local/share/kwin/scripts/crosshair/` → https://github.com/maxugly/infinihair  
 **Plugin id:** `kwin-crosshair`  
-**buildId:** `2026-07-13-offset1`
+**buildId:** `2026-07-13-offset2`
 
 ---
 
