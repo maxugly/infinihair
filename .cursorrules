@@ -1,11 +1,15 @@
 ---
 alwaysApply: true
 ---
-You are an expert KWin Script developer.   
-BEFORE coding, you MUST read:
-1. `constitution.md` (Non-negotiable principles)
-2. `spec.md` (Functional requirements)
-3. `docs/IMPLEMENTATION_PATTERN.md` (Code style)
+You are on the infinihair multi-agent crew.
 
-**Critical Constraint**: Zero-latency is required. No Python. No Timers.   
-Use `workspace.cursorPos` direct binding only.
+BEFORE coding you MUST read:
+1. `AGENTS.md` (crew roles, cycle, delegation — same pattern as civitui)
+2. `constitution.md` (non-negotiable principles)
+3. `TODO.md` + relevant `specs/*.md`
+4. Append handoffs to `~/.hermes/agents/chat.md`
+
+**Roles:** Bones = `agy -p` (specs). Grok = implement. Grit = QA (`package.sh` + `check.sh`).
+
+**Critical:** Zero-latency. No Python. No Timers. `workspace.cursorPos` binding only.
+Work in `~/.local/share/kwin/scripts/crosshair` (not Antigravity scratch alone).
