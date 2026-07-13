@@ -71,11 +71,16 @@ include_files: list[Path] = [
     Path("contents/ui/main.qml"),
     Path("contents/ui/Crosshair.qml"),
 ]
+# KWin genericscripted KCM looks for contents/ui/config.ui (not config/main.ui)
+config_ui = Path("contents/ui/config.ui")
+if config_ui.is_file() and config_ui.stat().st_size > 0:
+    include_files.append(config_ui)
 if xml_path.is_file() and xml_path.stat().st_size > 0:
     include_files.append(xml_path)
-ui_path = Path("contents/config/main.ui")
-if ui_path.is_file() and ui_path.stat().st_size > 0:
-    include_files.append(ui_path)
+# Legacy path — only if present and non-empty (prefer ui/config.ui)
+legacy_ui = Path("contents/config/main.ui")
+if legacy_ui.is_file() and legacy_ui.stat().st_size > 0:
+    include_files.append(legacy_ui)
 
 for path in include_files:
     if not path.is_file():
