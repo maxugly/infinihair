@@ -1,4 +1,13 @@
 *.kwinscript
 *.swp
+.*.swp
+*~
 .DS_Store
 build/
+
+# Local scratch / editor debris (not part of the package)
+addme
+addme2
+.addme2.kate-swp
+Screenshot_*.png
+*.kate-swp
