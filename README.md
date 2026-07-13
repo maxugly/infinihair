@@ -9,6 +9,8 @@ A **zero-latency**, full-screen crosshair overlay for KDE Plasma. Precise vertic
 
 **GitHub:** [maxugly/infinihair](https://github.com/maxugly/infinihair) · **Plugin id:** `kwin-crosshair`
 
+> **\*AI-developed.** Large parts of this project — design notes, QML/config, packaging scripts, and docs — were written or co-authored with AI assistants (including Grok / other tools in a multi-agent workflow), under human direction and review. That is intentional and disclosed up front: we are not trying to hide it or leave anyone unsure. Humans own product decisions, testing, and what ships.
+
 ## ✨ Features
 
 *   **🚀 Zero latency:** Direct `Workspace.cursorPos` binding (no cursor polling).  
@@ -60,7 +62,7 @@ Search **Infinite Crosshair** under Get New KWin Scripts when published.
 
 ### Known limitation (KDE, not this script)
 
-Each **Configure** click can open a **new** dialog (`kcm_kwin_scripts` always `new KCMultiDialog()`). Close extras; prefer one click. See `specs/bug-multi-config-dialog.md`.
+Each **Configure** click can open a **new** dialog (`kcm_kwin_scripts` always `new KCMultiDialog()`). Close extras; prefer one click. Details: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) and [specs/bug-multi-config-dialog.md](specs/bug-multi-config-dialog.md).
 
 Ruler form always shows **both** diagonal boxes (inches and cm); only the field matching **Units** is used. Switching units does **not** convert or copy values.
 
@@ -84,24 +86,9 @@ Rebind: **System Settings → Keyboard → Shortcuts** → search *Infinite Cros
 ./scripts/check.sh       # package + optional kpackagetool6 / shellcheck
 ```
 
-```bash
-journalctl --user -b --no-pager | rg InfiniteCrosshair | tail -40
-grep -A25 '\[Script-kwin-crosshair\]' ~/.config/kwinrc
-```
-
 Crew / status: `AGENTS.md`, `STATUS.md`, `specs/`.
 
-## ❓ Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| **Lines not visible** | Enable the script. Journal: `InfiniteCrosshair ready build=`. |
-| **Settings do nothing** | `isScriptLoaded kwin-crosshair` must be `true`. |
-| **Stale after re-enable** | `./scripts/reload.sh` or restart KWin once after upgrades. |
-| **Many Configure windows** | Upstream KWin Scripts KCM — one click. |
-| **Guides vanish mid-drag** | Need sticky build (`offset5`+). Keep auto-align on. |
-| **Main stays, guides gone** | Guides need a window target; mid-drag was fixed in sticky builds. |
-| **Wrong tick scale** | Set **Units** and the matching diagonal field (in vs cm are separate). |
+**Something broken?** → **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**
 
 ## 📜 License
 
@@ -113,4 +100,4 @@ Read [constitution.md](constitution.md), [AGENTS.md](AGENTS.md), and [STATUS.md]
 
 ---
 
-**Made with ❤️ for the KDE Community** · *KWin? K Now!*
+**Made with ❤️ for the KDE Community** · *KWin? K Now!* · *\*AI-developed (disclosed)*
