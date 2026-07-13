@@ -18,5 +18,23 @@
       <min>0.05</min>
       <max>1.0</max>
     </entry>
+    <entry name="ShowInchTicks" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="ScreenDiagonalInches" type="Double">
+      <label>Physical screen diagonal in inches (used with detected resolution to compute PPI)</label>
+      <default>27.0</default>
+      <min>5.0</min>
+      <max>120.0</max>
+    </entry>
+    <entry name="TickLength" type="Int">
+      <label>Length of major inch tick marks in pixels</label>
+      <default>10</default>
+      <min>2</min>
+      <max>64</max>
+    </entry>
+    <entry name="ShowHalfInchTicks" type="Bool">
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

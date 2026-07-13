@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>360</width>
-    <height>140</height>
+    <width>420</width>
+    <height>280</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -87,6 +87,107 @@
      </property>
      <property name="value">
       <double>0.800000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="labelShowInchTicks">
+     <property name="text">
+      <string>Show inch ticks</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_ShowInchTicks</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QCheckBox" name="kcfg_ShowInchTicks">
+     <property name="text">
+      <string>Tick marks every inch on the crosshair</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="labelScreenDiagonal">
+     <property name="text">
+      <string>Screen diagonal</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_ScreenDiagonalInches</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QDoubleSpinBox" name="kcfg_ScreenDiagonalInches">
+     <property name="toolTip">
+      <string>Physical diagonal size of your monitor (e.g. 27 for a 27&quot; display). Combined with the detected resolution of the screen under the cursor to compute pixels-per-inch.</string>
+     </property>
+     <property name="decimals">
+      <number>1</number>
+     </property>
+     <property name="minimum">
+      <double>5.000000000000000</double>
+     </property>
+     <property name="maximum">
+      <double>120.000000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.500000000000000</double>
+     </property>
+     <property name="value">
+      <double>27.000000000000000</double>
+     </property>
+     <property name="suffix">
+      <string> in</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="labelTickLength">
+     <property name="text">
+      <string>Tick length</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_TickLength</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="1">
+    <widget class="QSpinBox" name="kcfg_TickLength">
+     <property name="minimum">
+      <number>2</number>
+     </property>
+     <property name="maximum">
+      <number>64</number>
+     </property>
+     <property name="value">
+      <number>10</number>
+     </property>
+     <property name="suffix">
+      <string> px</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="labelShowHalfInchTicks">
+     <property name="text">
+      <string>Half-inch ticks</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_ShowHalfInchTicks</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="1">
+    <widget class="QCheckBox" name="kcfg_ShowHalfInchTicks">
+     <property name="text">
+      <string>Shorter marks every ½ inch</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
      </property>
     </widget>
    </item>

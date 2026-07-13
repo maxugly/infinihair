@@ -19,14 +19,18 @@ Item {
     readonly property real opacity: KWin.readConfig("Opacity", 0.8)
 
     // 2. Global Cursor Binding (No Timers!)
-    property point cursorPos: workspace.cursorPos
+    // Plasma 6 QML: capital Workspace (lowercase workspace is JS-only / undefined in QML)
+    property point cursorPos: Workspace.cursorPos
 
-    // 3. Rendering (Direct Primitives)
+    // 3. Surface: bare Item is NOT painted. Use PlasmaCore.Dialog or Window
+    //    (see contents/ui/Crosshair.qml). Size with Workspace.virtualScreenSize.
+
+    // 4. Rendering (Direct Primitives)
     Rectangle {
         x: root.cursorPos.x - (root.lineWidth / 2)
         y: 0
         width: root.lineWidth
-        height: workspace.workspaceHeight // Full virtual height
+        height: Workspace.virtualScreenSize.height
         color: root.lineColor
         opacity: root.opacity
         z: 9999
