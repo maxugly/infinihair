@@ -8,7 +8,10 @@ import org.kde.plasma.plasma5support as P5
 Window {
     id: root
 
-    visible: true
+    // Overlay surface: not a managed app window. BypassWindowManagerHint keeps
+    // it out of Alt+Tab / taskbar / pager (skipSwitcher etc. are KWin::Window
+    // client props and do not exist on QtQuick.Window).
+    visible: root.crosshairEnabled
     color: "transparent"
     flags: Qt.BypassWindowManagerHint
          | Qt.FramelessWindowHint
@@ -24,6 +27,9 @@ Window {
     // Must match metadata.json KPlugin.Id → [Script-<Id>] in kwinrc
     readonly property string configSection: "Script-kwin-crosshair"
     readonly property string pluginId: "kwin-crosshair"
+
+    // Runtime visibility (toggle via ShortcutHandler; not the script Enabled flag).
+    property bool crosshairEnabled: true
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     property color lineColor: "#FF0000"
@@ -360,6 +366,20 @@ Window {
         }
     }
 
+    function toggleCrosshair() {
+        root.crosshairEnabled = !root.crosshairEnabled;
+        console.log("InfiniteCrosshair toggled",
+                    root.crosshairEnabled ? "ON" : "OFF");
+    }
+
+    // System Settings → Keyboard → Shortcuts → KWin
+    ShortcutHandler {
+        name: "Infinite Crosshair: Toggle"
+        text: "Infinite Crosshair: Toggle"
+        sequence: "Meta+Shift+X"
+        onActivated: root.toggleCrosshair()
+    }
+
     Component.onCompleted: {
         seedFromReadConfig();
         kickConfigPoll();
@@ -373,6 +393,7 @@ Window {
                     "ticks=", root.showInchTicks,
                     "diagIn=", root.screenDiagonalInches,
                     "ppi=", root.pixelsPerInch.toFixed(2),
-                    "tickStep=", root.tickStepPx.toFixed(2));
+                    "tickStep=", root.tickStepPx.toFixed(2),
+                    "enabled=", root.crosshairEnabled);
     }
 }
