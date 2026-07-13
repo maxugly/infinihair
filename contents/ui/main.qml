@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-offset2"
+    readonly property string buildId: "2026-07-13-offset3"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -74,11 +74,81 @@ Window {
     property int offsetHorizontalColorB: 0
     property color offsetHorizontalColor: Qt.rgba(0, 1, 0, 1)
 
+    // When true: second V/H guides snap to nearest frame edges of the window
+    // under the cursor (or the window being moved) — live, every cursor move.
+    // When false: fixed offsets from Configure (cursor + offsetVerticalOffset).
     property bool autoOffsetOnMove: true
     property var offsetTrackWindow: null
+    // Bumped on move/resize steps so edge positions rebind when geometry
+    // changes without a cursorPos change.
+    property int autoAlignRev: 0
 
-    readonly property real offsetVerticalPosX: root.linePosX + root.offsetVerticalOffset
-    readonly property real offsetHorizontalPosY: root.linePosY + root.offsetHorizontalOffset
+    // Live target window for automagic edge align (move-tracked wins).
+    readonly property var autoAlignWindow: {
+        void Workspace.cursorPos;
+        void Workspace.stackingOrder;
+        void root.autoAlignRev;
+        if (root.offsetTrackWindow)
+            return root.offsetTrackWindow;
+        if (root.autoOffsetOnMove)
+            return root.windowUnderCursor();
+        return null;
+    }
+
+    // Nearest frame edges for automagic (manual offset fallback when no window).
+    readonly property real autoEdgeX: {
+        void Workspace.cursorPos;
+        void root.autoAlignRev;
+        const w = root.autoAlignWindow;
+        const g = root.windowFrameGeometry(w);
+        if (!g)
+            return root.linePosX + root.offsetVerticalOffset;
+        const pos = Workspace.cursorPos;
+        const left = g.x;
+        const right = g.x + g.width;
+        return (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
+    }
+
+    readonly property real autoEdgeY: {
+        void Workspace.cursorPos;
+        void root.autoAlignRev;
+        const w = root.autoAlignWindow;
+        const g = root.windowFrameGeometry(w);
+        if (!g)
+            return root.linePosY + root.offsetHorizontalOffset;
+        const pos = Workspace.cursorPos;
+        const top = g.y;
+        const bottom = g.y + g.height;
+        return (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
+    }
+
+    // Draw positions for second guides.
+    readonly property real offsetVerticalPosX: {
+        void Workspace.cursorPos;
+        void root.autoAlignRev;
+        if (root.autoOffsetOnMove && root.autoAlignWindow)
+            return root.autoEdgeX;
+        return root.linePosX + root.offsetVerticalOffset;
+    }
+
+    readonly property real offsetHorizontalPosY: {
+        void Workspace.cursorPos;
+        void root.autoAlignRev;
+        if (root.autoOffsetOnMove && root.autoAlignWindow)
+            return root.autoEdgeY;
+        return root.linePosY + root.offsetHorizontalOffset;
+    }
+
+    // Automagic shows both guides when auto-align has a window (unless cleared
+    // and auto is off). Manual toggles still apply when auto is off.
+    readonly property bool showOffsetVertical: root.crosshairEnabled && (
+        root.autoOffsetOnMove && root.autoAlignWindow
+            ? true
+            : root.offsetVerticalEnabled)
+    readonly property bool showOffsetHorizontal: root.crosshairEnabled && (
+        root.autoOffsetOnMove && root.autoAlignWindow
+            ? true
+            : root.offsetHorizontalEnabled)
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
@@ -799,9 +869,11 @@ Window {
     }
 
     function refreshOffsetFromTrackedWindow() {
+        root.autoAlignRev += 1;
         const w = root.offsetTrackWindow;
         if (!w || !root.autoOffsetOnMove)
             return;
+        // Also bake into spinbox offsets so disabling auto keeps last edges.
         const g = root.windowFrameGeometry(w);
         root.setOffsetFromFrame(g, "move");
     }
@@ -831,8 +903,8 @@ Window {
             w.interactiveMoveResizeFinished.connect(function () {
                 if (root.offsetTrackWindow === w) {
                     root.refreshOffsetFromTrackedWindow();
-                    // Keep mode + last offset so the next placement still shows edges.
                     root.offsetTrackWindow = null;
+                    root.autoAlignRev += 1;
                 }
             });
         } catch (e2) {
@@ -872,9 +944,9 @@ Window {
         z: 9999
     }
 
-    // Second vertical guide (offset from cursor)
+    // Second vertical guide (manual offset, or automagic nearest frame edge)
     Rectangle {
-        visible: root.crosshairEnabled && root.offsetVerticalEnabled
+        visible: root.showOffsetVertical
         x: root.offsetVerticalPosX - Math.max(1, root.lineWidth) / 2
         y: 0
         width: Math.max(1, root.lineWidth)
@@ -884,9 +956,9 @@ Window {
         z: 9998
     }
 
-    // Second horizontal guide (offset from cursor)
+    // Second horizontal guide (manual offset, or automagic nearest frame edge)
     Rectangle {
-        visible: root.crosshairEnabled && root.offsetHorizontalEnabled
+        visible: root.showOffsetHorizontal
         x: 0
         y: root.offsetHorizontalPosY - Math.max(1, root.lineWidth) / 2
         width: parent.width

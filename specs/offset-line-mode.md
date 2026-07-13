@@ -1,7 +1,7 @@
 # Feature: Offset guide lines (secondary V/H)
 
-**Status:** Implemented (v2 — Max-corrected model)  
-**buildId:** `2026-07-13-offset2`
+**Status:** Implemented (v3 — automagic edge align)  
+**buildId:** `2026-07-13-offset3`
 
 ## Product model (Max)
 
@@ -32,7 +32,7 @@ offsetHorizontalY = cursor.y + OffsetHorizontalOffset // negative = above cursor
 | `OffsetHorizontalEnabled` | Bool | false | checkbox |
 | `OffsetHorizontalOffset` | Int | 100 | spinbox |
 | `OffsetHorizontalColor` | Color | `#00FF00` | KColorButton |
-| `AutoOffsetOnMove` | Bool | true | while move/resize, set offsets from nearest frame edges + enable both guides |
+| `AutoOffsetOnMove` | Bool | true | **Automagic:** live-snap second guides to nearest frame edges of window under cursor (and while moving). Off = manual offsets only. |
 
 Disk also mirrors `OffsetVerticalColorR/G/B` and `OffsetHorizontalColorR/G/B` (like primary) for re-enable robustness — not shown in UI.
 
@@ -45,9 +45,17 @@ Disk also mirrors `OffsetVerticalColorR/G/B` and `OffsetHorizontalColorR/G/B` (l
 | **Meta+Shift+B** | Capture: nearest window edges under cursor → set both offsets + enable both |
 | **Meta+Shift+C** | Clear: disable both guides, offsets → 0 |
 
-## Auto on move
+## Automagic align (`AutoOffsetOnMove`, default on)
 
-When `AutoOffsetOnMove` and the user interactively moves/resizes a window: recompute offsets so the secondary lines sit on the nearest L/R and T/B **frame** edges of that window; enable both guides.
+No shortcut required for daily use:
+
+1. Hover any normal window → second V/H guides appear on the **nearest** left/right and top/bottom **frame** edges (recomputed from `Workspace.cursorPos` every move — no Timer).
+2. Drag/resize that window → tracked window wins; guides stick to its edges.
+3. Leave all windows → guides hide (unless you enabled them manually with fixed offsets while auto is **off**).
+
+Manual spinbox offsets apply when auto is **off**, or as fallback when no window is under the cursor.
+
+Capture (**Meta+Shift+B**) still freezes offsets into the spinbox values for manual mode.
 
 ## Out of scope
 

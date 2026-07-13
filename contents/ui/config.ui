@@ -274,10 +274,10 @@
    <item row="6" column="1">
     <widget class="QCheckBox" name="kcfg_AutoOffsetOnMove">
      <property name="toolTip">
-      <string>While moving/resizing a window, set both guide offsets to the nearest frame edges and enable them.</string>
+      <string>Automagic: second V/H guides snap to the nearest edges of the window under the cursor (and while you move/resize it). Turn off to use only the manual offset values above.</string>
      </property>
      <property name="text">
-      <string>Auto-set guide offsets from window borders while moving/resizing</string>
+      <string>Auto-align guides to window borders (under cursor / while moving)</string>
      </property>
      <property name="checked">
       <bool>true</bool>

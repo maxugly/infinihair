@@ -74,7 +74,7 @@
     </entry>
 
     <entry name="AutoOffsetOnMove" type="Bool">
-      <label>While moving or resizing a window, set guide offsets to nearest frame edges</label>
+      <label>Auto-align second guides to nearest window frame edges under cursor / while moving</label>
       <default>true</default>
     </entry>
   </group>
