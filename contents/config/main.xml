@@ -43,5 +43,9 @@
     <entry name="ShowHalfInchTicks" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="AutoOffsetOnMove" type="Bool">
+      <label>While moving or resizing a window, offset the crosshair to the nearest frame edges</label>
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

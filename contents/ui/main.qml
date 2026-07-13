@@ -10,7 +10,7 @@ Window {
 
     // Bump when shipping behavior fixes — logged at ready so we can tell if
     // System Settings re-enable is running a stale QML body from the session.
-    readonly property string buildId: "2026-07-13-reen1"
+    readonly property string buildId: "2026-07-13-offset1"
 
     // Stable caption so we can find this surface in Workspace.stackingOrder
     // and set KWin client skip* flags (Qt window flags alone are not enough
@@ -42,9 +42,29 @@ Window {
     // Must match ShortcutHandler.name (KWin global-accel action id).
     readonly property string toggleShortcutName: "Infinite Crosshair: Toggle"
     readonly property string toggleShortcutDefault: "Meta+Shift+X"
+    readonly property string offsetModeShortcutName: "Infinite Crosshair: Offset Mode"
+    readonly property string offsetModeShortcutDefault: "Meta+Shift+O"
+    readonly property string captureOffsetShortcutName: "Infinite Crosshair: Capture Border Offset"
+    readonly property string captureOffsetShortcutDefault: "Meta+Shift+B"
+    readonly property string clearOffsetShortcutName: "Infinite Crosshair: Clear Offset"
+    readonly property string clearOffsetShortcutDefault: "Meta+Shift+C"
 
     // Runtime visibility (toggle via ShortcutHandler; not the script Enabled flag).
     property bool crosshairEnabled: true
+
+    // --- Offset line mode (see specs/offset-line-mode.md) ---
+    // When active: lines/ticks at cursor - (offsetX, offsetY) so they sit on a
+    // window border rather than the grab point under the cursor.
+    property bool offsetModeActive: false
+    property real offsetX: 0
+    property real offsetY: 0
+    property bool autoOffsetOnMove: true
+    property var offsetTrackWindow: null
+
+    readonly property real linePosX: Workspace.cursorPos.x
+        - (root.offsetModeActive ? root.offsetX : 0)
+    readonly property real linePosY: Workspace.cursorPos.y
+        - (root.offsetModeActive ? root.offsetY : 0)
 
     // --- Live config (mutable; seeded on start, refreshed from disk) ---
     // UI: KColorButton ↔ kcfg_LineColor (KConfig Color). Runtime always uses
@@ -121,6 +141,7 @@ Window {
         + "print('ScreenDiagonalInches='+kr('ScreenDiagonalInches','27.0'))\n"
         + "print('TickLength='+kr('TickLength','10'))\n"
         + "print('ShowHalfInchTicks='+kr('ShowHalfInchTicks','true'))\n"
+        + "print('AutoOffsetOnMove='+kr('AutoOffsetOnMove','true'))\n"
         + "PY"
 
     property int configPollCount: 0
@@ -330,6 +351,13 @@ Window {
             root.parseBool(map.ShowHalfInchTicks !== undefined ? map.ShowHalfInchTicks : true, true),
             sourceTag || "map"
         );
+        if (map.AutoOffsetOnMove !== undefined) {
+            const ao = root.parseBool(map.AutoOffsetOnMove, true);
+            if (autoOffsetOnMove !== ao) {
+                console.log("InfiniteCrosshair AutoOffsetOnMove", autoOffsetOnMove, "->", ao);
+                autoOffsetOnMove = ao;
+            }
+        }
     }
 
     function applyConfigLines(stdout, sourceTag) {
@@ -346,7 +374,8 @@ Window {
         const keys = {
             "LineColorR": 1, "LineColorG": 1, "LineColorB": 1, "LineColor": 1,
             "LineWidth": 1, "Opacity": 1, "ShowInchTicks": 1,
-            "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1
+            "ScreenDiagonalInches": 1, "TickLength": 1, "ShowHalfInchTicks": 1,
+            "AutoOffsetOnMove": 1
         };
         for (let i = 0; i < rawLines.length; ++i) {
             const line = rawLines[i];
@@ -386,8 +415,10 @@ Window {
         const diag = root.parseRealClamped(KWin.readConfig("ScreenDiagonalInches", 27.0), 27.0, 5.0, 120.0);
         const tlen = root.parseIntClamped(KWin.readConfig("TickLength", 10), 10, 2, 64);
         const half = root.parseBool(KWin.readConfig("ShowHalfInchTicks", true), true);
+        root.autoOffsetOnMove = root.parseBool(KWin.readConfig("AutoOffsetOnMove", true), true);
         console.log("InfiniteCrosshair seed rgb=", r, g, b,
                     "lw=", lw, "op=", op, "ticks=", ticks, "tlen=", tlen,
+                    "autoOffset=", root.autoOffsetOnMove,
                     "build=", root.buildId);
         applyConfigValues(r, g, b, lw, op, ticks, diag, tlen, half, "seed");
     }
@@ -433,6 +464,7 @@ Window {
         }
         function onWindowAdded(window) {
             root.claimOverlayClient(window);
+            root.hookWindowMoveResize(window);
         }
     }
 
@@ -548,10 +580,148 @@ Window {
         return (indexFromCenter % 2) === 0;
     }
 
+    function windowFrameGeometry(w) {
+        if (!w)
+            return null;
+        try {
+            if (w.frameGeometry)
+                return w.frameGeometry;
+        } catch (e) { /* fall through */ }
+        try {
+            if (w.geometry)
+                return w.geometry;
+        } catch (e2) { /* fall through */ }
+        return null;
+    }
+
+    function windowUnderCursor() {
+        const list = Workspace.stackingOrder;
+        if (!list)
+            return null;
+        const pos = Workspace.cursorPos;
+        for (let i = list.length - 1; i >= 0; --i) {
+            const w = list[i];
+            if (!w || root.isOurOverlayClient(w))
+                continue;
+            try {
+                if (w.desktopWindow === true || w.dock === true)
+                    continue;
+                if (w.deleted === true)
+                    continue;
+            } catch (e) { /* ignore */ }
+            const g = root.windowFrameGeometry(w);
+            if (!g)
+                continue;
+            if (pos.x >= g.x && pos.x < g.x + g.width
+                    && pos.y >= g.y && pos.y < g.y + g.height)
+                return w;
+        }
+        return null;
+    }
+
+    // Nearest vertical edge → offsetX; nearest horizontal edge → offsetY.
+    function setOffsetFromFrame(g, sourceTag) {
+        if (!g)
+            return false;
+        const pos = Workspace.cursorPos;
+        const left = g.x;
+        const right = g.x + g.width;
+        const top = g.y;
+        const bottom = g.y + g.height;
+        const edgeX = (Math.abs(pos.x - left) <= Math.abs(pos.x - right)) ? left : right;
+        const edgeY = (Math.abs(pos.y - top) <= Math.abs(pos.y - bottom)) ? top : bottom;
+        root.offsetX = pos.x - edgeX;
+        root.offsetY = pos.y - edgeY;
+        root.offsetModeActive = true;
+        console.log("InfiniteCrosshair offset set",
+                    "ox=", root.offsetX.toFixed(1), "oy=", root.offsetY.toFixed(1),
+                    "edge=", edgeX.toFixed(0) + "," + edgeY.toFixed(0),
+                    "src=", sourceTag || "n/a");
+        return true;
+    }
+
+    function captureBorderOffset() {
+        const w = root.windowUnderCursor();
+        if (!w) {
+            console.log("InfiniteCrosshair capture offset: no window under cursor");
+            return;
+        }
+        const g = root.windowFrameGeometry(w);
+        if (!root.setOffsetFromFrame(g, "capture"))
+            console.log("InfiniteCrosshair capture offset: no geometry");
+    }
+
+    function clearOffset() {
+        root.offsetX = 0;
+        root.offsetY = 0;
+        root.offsetModeActive = false;
+        root.offsetTrackWindow = null;
+        console.log("InfiniteCrosshair offset cleared");
+    }
+
+    function toggleOffsetMode() {
+        root.offsetModeActive = !root.offsetModeActive;
+        if (!root.offsetModeActive)
+            root.offsetTrackWindow = null;
+        console.log("InfiniteCrosshair offset mode",
+                    root.offsetModeActive ? "ON" : "OFF",
+                    "ox=", root.offsetX.toFixed(1), "oy=", root.offsetY.toFixed(1));
+    }
+
+    function refreshOffsetFromTrackedWindow() {
+        const w = root.offsetTrackWindow;
+        if (!w || !root.autoOffsetOnMove)
+            return;
+        const g = root.windowFrameGeometry(w);
+        root.setOffsetFromFrame(g, "move");
+    }
+
+    function hookWindowMoveResize(w) {
+        if (!w || root.isOurOverlayClient(w))
+            return;
+        try {
+            if (w._infinihairOffsetHooked)
+                return;
+            w._infinihairOffsetHooked = true;
+        } catch (e) {
+            // Some clients may not allow expando props; still connect.
+        }
+        try {
+            w.interactiveMoveResizeStarted.connect(function () {
+                if (!root.autoOffsetOnMove)
+                    return;
+                root.offsetTrackWindow = w;
+                root.refreshOffsetFromTrackedWindow();
+            });
+            w.interactiveMoveResizeStepped.connect(function () {
+                if (root.offsetTrackWindow !== w)
+                    return;
+                root.refreshOffsetFromTrackedWindow();
+            });
+            w.interactiveMoveResizeFinished.connect(function () {
+                if (root.offsetTrackWindow === w) {
+                    root.refreshOffsetFromTrackedWindow();
+                    // Keep mode + last offset so the next placement still shows edges.
+                    root.offsetTrackWindow = null;
+                }
+            });
+        } catch (e2) {
+            console.log("InfiniteCrosshair hook move/resize failed", e2);
+        }
+    }
+
+    function hookAllWindowsMoveResize() {
+        const list = Workspace.stackingOrder;
+        if (!list)
+            return;
+        for (let i = 0; i < list.length; ++i)
+            root.hookWindowMoveResize(list[i]);
+    }
+
     // Vertical line
     Rectangle {
         visible: root.crosshairEnabled
-        x: Workspace.cursorPos.x - Math.max(1, root.lineWidth) / 2
+        x: root.linePosX - Math.max(1, root.lineWidth) / 2
         y: 0
         width: Math.max(1, root.lineWidth)
         height: parent.height
@@ -564,7 +734,7 @@ Window {
     Rectangle {
         visible: root.crosshairEnabled
         x: 0
-        y: Workspace.cursorPos.y - Math.max(1, root.lineWidth) / 2
+        y: root.linePosY - Math.max(1, root.lineWidth) / 2
         width: parent.width
         height: Math.max(1, root.lineWidth)
         color: root.lineColor
@@ -575,8 +745,8 @@ Window {
     // Inch ticks (defaults ON; independent of config poller success)
     Item {
         id: tickOrigin
-        x: Workspace.cursorPos.x
-        y: Workspace.cursorPos.y
+        x: root.linePosX
+        y: root.linePosY
         visible: root.crosshairEnabled && root.showInchTicks && root.tickStepPx > 0.5
         z: 10000
 
@@ -631,12 +801,34 @@ Window {
         onActivated: root.toggleCrosshair()
     }
 
+    ShortcutHandler {
+        name: root.offsetModeShortcutName
+        text: root.offsetModeShortcutName
+        sequence: root.offsetModeShortcutDefault
+        onActivated: root.toggleOffsetMode()
+    }
+
+    ShortcutHandler {
+        name: root.captureOffsetShortcutName
+        text: root.captureOffsetShortcutName
+        sequence: root.captureOffsetShortcutDefault
+        onActivated: root.captureBorderOffset()
+    }
+
+    ShortcutHandler {
+        name: root.clearOffsetShortcutName
+        text: root.clearOffsetShortcutName
+        sequence: root.clearOffsetShortcutDefault
+        onActivated: root.clearOffset()
+    }
+
     Component.onCompleted: {
         seedFromReadConfig();
         kickConfigPoll();
         // Caption / client mapping can lag one frame after the surface maps.
         Qt.callLater(root.hideOverlayFromWmLists);
         hideClaimRetry.restart();
+        Qt.callLater(root.hookAllWindowsMoveResize);
 
         const s = root.screenUnderCursor();
         const g = s ? s.geometry : null;
@@ -650,8 +842,11 @@ Window {
                     "diagIn=", root.screenDiagonalInches,
                     "ppi=", root.pixelsPerInch.toFixed(2),
                     "tickStep=", root.tickStepPx.toFixed(2),
+                    "autoOffset=", root.autoOffsetOnMove,
                     "enabled=", root.crosshairEnabled,
-                    "toggle=", root.toggleShortcutDefault);
+                    "toggle=", root.toggleShortcutDefault,
+                    "offsetMode=", root.offsetModeShortcutDefault,
+                    "capture=", root.captureOffsetShortcutDefault);
     }
 
     // Brief retries: Wayland maps the surface after onCompleted.

@@ -3,13 +3,14 @@
 **Date:** 2026-07-13  
 **Repo:** `~/.local/share/kwin/scripts/crosshair/` → https://github.com/maxugly/infinihair  
 **Plugin id:** `kwin-crosshair`  
-**buildId:** `2026-07-13-reen1`
+**buildId:** `2026-07-13-offset1`
 
 ---
 
 ## One-line status
 
 **Disable / re-enable works (Max confirmed).** Color picker works with live apply.  
+**Offset line mode (v1)** available — borders under grab, not cursor.  
 **Open annoyance:** every Configure click opens a **new** settings window — **KWin System Settings bug**, not fixable inside this package.
 
 ---
@@ -22,6 +23,17 @@
 | Color picker present | **Yes** |
 | Settings / color affect crosshair | **Yes** (after lifecycle fixes + session on reen1) |
 | Configure button spawns many windows | **Still yes** — each click = new dialog |
+| Offset line mode | **Shipped v1** — Max smoke pending |
+
+### Offset line mode (v1) — shortcuts
+
+| shortcut | action |
+|---|---|
+| **Meta+Shift+O** | Toggle offset mode |
+| **Meta+Shift+B** | Capture nearest window border under cursor (turns mode on) |
+| **Meta+Shift+C** | Clear offset / mode off |
+
+While **moving/resizing** a window (config: *Auto offset on move*, default on), offsets update so lines track nearest frame edges. Spec: `specs/offset-line-mode.md`.
 
 ---
 

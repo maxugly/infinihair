@@ -10,7 +10,8 @@
 | Disable / re-enable in KWin Scripts | **PASS (Max)** |
 | Color picker + live apply | **PASS (Max)** |
 | Multi Configure dialogs | **Upstream KWin** — wontfix in-package (documented) |
-| buildId | `2026-07-13-reen1` |
+| Offset line mode v1 | **Shipped** — Max smoke |
+| buildId | `2026-07-13-offset1` |
 
 ---
 
@@ -20,6 +21,8 @@
 - [x] Lifecycle notes + research closed (`specs/research-kwin-lifecycle.md`)  
 - [x] BUG-02 root cause + README known limitation  
 - [x] Crew docs (`STATUS`, `AGENTS`, `TODO`) match reality  
+- [x] Offset line mode v1 (`specs/offset-line-mode.md`)  
+- [ ] Max smoke offset: capture border, drag window, toggle O / clear C  
 
 ## Optional / backlog (Bones before large work)
 
