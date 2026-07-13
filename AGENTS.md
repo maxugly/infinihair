@@ -31,17 +31,13 @@ yourself writing code without first checking whether Bones has a plan for it
 in `specs/` + `TODO.md`, you're off the rails. If you commit without a QA pass
 when the change is non-trivial, you're off the rails.
 
-### Research freeze (active as of 2026-07-13)
+### Current product state (2026-07-13)
 
-Read **`STATUS.md` first**. Product QML/feature work is **paused** until Bones
-closes `specs/research-kwin-lifecycle.md` with decision A/B/C.
+Read **`STATUS.md` first.** Max accepted: disable/re-enable + color picker + live apply.
 
-- Grok: docs, packaging, or **tasked** instrumentation only.
-- Bones: owns KWin lifecycle research plan (skill: `skills/KWIN_RESEARCHER.md`).
-- Grit: does not PASS “features” during freeze; may QA instrumentation.
-- Max: runs live E1–E4 checks when available.
-
-**Do not** thrash color storage or Window flags without research evidence.
+- Multi Configure dialogs = **upstream KWin KCM** (not our package). See `specs/bug-multi-config-dialog.md`.
+- New features still need Bones specs. Do not thrash color storage or Window flags without evidence.
+- Lifecycle research notes: `specs/research-kwin-lifecycle.md` (closed with Max PASS).
 
 ## The cycle
 
@@ -184,13 +180,14 @@ crosshair/   # also known as infinihair on GitHub
 | QA skill | `skills/SENTINEL.md` + `qa/` |
 | Agy (Antigravity) | `/home/m/.local/bin/agy` |
 
-## Open work (see STATUS.md)
+## Open / closed work (see STATUS.md)
 
-| id | summary | next |
+| id | summary | status |
 |---|---|---|
-| RESEARCH | KWin load/unload/config vs peers | Bones + Max; skill KWIN_RESEARCHER |
-| BUG-02 | Multi Configure dialogs | wontfix-package |
-| BUG-03 | Color picker Apply dead | after research decision |
+| disable/re-enable | System Settings toggle | **PASS (Max)** |
+| color picker + Apply | `KColorButton` + live poll | **PASS (Max)** |
+| BUG-02 | Multi Configure dialogs | **upstream KWin** — wontfix-package |
+| debt | `main.qml` ≡ `Crosshair.qml` monolith | backlog |
 
 ## Phased ownership
 

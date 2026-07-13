@@ -1,47 +1,78 @@
 # BUG-02 — Multiple Configure dialogs
 
-**Status:** Decision — **wontfix in-package** (KCM host behavior)  
-**Priority:** P2 (document; do not thrash product QML)  
-**Updated:** 2026-07-13 (Grok + local binary evidence; Bones run timed out mid-research)
+**Status:** Confirmed upstream KWin KCM — **wontfix in-package**  
+**Priority:** P3 (UX annoyance; does not break crosshair)  
+**Updated:** 2026-07-13 (Max still hits it; Grok confirmed source)
 
 ## Symptom
 
-Every click of **Configure** on Infinite Crosshair in System Settings → KWin Scripts opens a **new** settings window.
+Every click of **Configure** on a KWin script in System Settings opens a **new** settings window (stacks forever).
 
-## Context
+## Root cause (KWin, not infinihair)
 
-- Package uses `"X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted"`.
-- UI: `contents/ui/config.ui` + schema `contents/config/main.xml`.
-- Our package **does not** open dialogs from QML.
+File: `kwin/src/kcms/scripts/module.cpp` (Plasma 6 / current master):
 
-## Evidence (host owns the dialog)
+```cpp
+void Module::configure(const KPluginMetaData &data)
+{
+    auto dialog = new KCMultiDialog();
+    dialog->addModule(data, QVariantList{data.pluginId(), QStringLiteral("KWin/Script")});
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+}
+```
 
-From `kcm_kwin_scripts.so` strings / symbols on this machine:
+Called from the scripts KCM UI as `kcm.configure(model.config)`.
 
-- QML trigger: `onConfigTriggered: kcm.configure(model.config)`
-- Dialog type: `KCMultiDialog` (`addModule` + `QWidget::show`)
+No check for an existing dialog for that `pluginId`.
 
-Each Configure action constructs and shows a new multi-dialog. There is **no package-level API** in `config.ui` / `main.xml` to register a singleton or raise-existing window.
+## Scope
+
+Affects **every** script using `X-KDE-ConfigModule: kwin/effects/configs/kcm_kwin4_genericscripted` (Infinite Crosshair, Mouse Tiler, Video Wall, …).
 
 ## Decision
 
 | option | verdict |
 |---|---|
-| Fix inside pure KWin script package | **Not available** with genericscripted KCM |
-| Custom C++/QML KCM just for singleton dialog | Out of scope / disproportionate |
-| Upstream KDE fix (raise-or-reuse dialog) | Correct long-term home |
-| Document as known issue | **Accepted for now** |
+| Fix inside pure KWin script package | **Impossible** |
+| Custom config module for infinihair only | Out of scope |
+| Upstream KWin patch | **Correct fix** |
+| Document + workaround | **Current** |
 
-**Resolution for infinihair:** **wontfix-package**. Operators close extra dialogs manually. Prefer one Configure click.
+## Suggested upstream fix (sketch)
 
-## Work remaining
+Keep open dialogs by plugin id; raise if present:
 
-- [x] Written decision (this file)
-- [ ] Optional: one-line known issue in `README.md` (Grok when touching README polish)
-- [ ] Optional: Max file/upstream note against KWin scripts KCM if annoying enough
-- [x] TODO: do not schedule Grok implementation for BUG-02
+```cpp
+// Module members: QHash<QString, QPointer<KCMultiDialog>> m_configDialogs;
 
-## Exit criteria
+void Module::configure(const KPluginMetaData &data)
+{
+    const QString id = data.pluginId();
+    if (auto *existing = m_configDialogs.value(id).data()) {
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+    auto *dialog = new KCMultiDialog();
+    dialog->addModule(data, QVariantList{id, QStringLiteral("KWin/Script")});
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    m_configDialogs.insert(id, dialog);
+    QObject::connect(dialog, &QObject::destroyed, this, [this, id]() {
+        m_configDialogs.remove(id);
+    });
+    dialog->show();
+}
+```
 
-- [x] Decision recorded
-- [x] Not blocking BUG-01 / product stability
+(Exact API may need KF6 `KCMultiDialog` review; intent is raise-or-create.)
+
+## Workaround
+
+Close extra windows; click Configure once.
+
+## Exit criteria (package)
+
+- [x] Decision + source citation recorded  
+- [x] STATUS documents known issue  
+- [ ] Optional: Max/Bones file bugs.kde.org or invent.kde.org MR  

@@ -10,53 +10,58 @@ A **zero-latency**, full-screen crosshair overlay for KDE Plasma. Renders precis
 
 ## ✨ Features
 
-*   **🚀 Zero Latency:** Native KWin compositor integration ensures buttery-smooth 60fps+ tracking.  
-*   **🖥️ Multi-Monitor Ready:** Lines span the entire virtual desktop geometry, seamlessly crossing screen boundaries.  
-*   **🎨 Fully Customizable:** Configure color, thickness, and opacity via System Settings.  
-*   **🌍 Global Overlay:** Works above all windows, including full-screen applications and games.  
-*   **⚡ Lightweight:** Negligible CPU/GPU usage (<1% load).
+*   **🚀 Zero Latency:** Native KWin compositor integration — direct `Workspace.cursorPos` binding (no cursor polling).  
+*   **🖥️ Multi-Monitor Ready:** Lines span the virtual desktop (`Workspace.virtualScreenSize`).  
+*   **🎨 Fully Customizable:** Color (picker), thickness, opacity, inch ticks / PPI via System Settings.  
+*   **⌨️ Toggle shortcut:** **Meta+Shift+X** — *Infinite Crosshair: Toggle* (rebind under Keyboard → Shortcuts → KWin).  
+*   **🌍 Global Overlay:** Full-screen transparent window above other surfaces; input-through so clicks pass through.  
+*   **⚡ Lightweight:** Simple `Rectangle` scene-graph primitives.
 
 ## 📦 Installation
 
-### Method 1: KDE Store (Recommended)
-1.  Open **System Settings** > **Window Management** > **KWin Scripts**.  
-2.  Click **Get New KWin Scripts...**  
-3.  Search for **"Infinite Crosshair"**.  
-4.  Click **Install**, then check the box to enable it.  
-5.  Click **Apply**.
+**GitHub:** [maxugly/infinihair](https://github.com/maxugly/infinihair)  
+**Plugin id:** `kwin-crosshair`
 
-### Method 2: Manual Installation (`.kwinscript`)
-1.  Download the latest `crosshair.kwinscript` file from the [Releases](https://github.com/yourusername/kwin-crosshair/releases) page.  
-2.  Open **System Settings** > **Window Management** > **KWin Scripts**.  
-3.  Click **Import KWin script...** (top-right corner).  
-4.  Select the downloaded `.kwinscript` file.  
-5.  Enable the script and click **Apply**.
+### Method 1: From this repo (developers)
 
-### Method 3: From Source (Developers)
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/kwin-crosshair.git
-cd kwin-crosshair
+git clone https://github.com/maxugly/infinihair.git
+cd infinihair   # or: ~/.local/share/kwin/scripts/crosshair
 
-# Install via kpackagetool6
-kpackagetool6 --type=KWin/Script --install .
+./scripts/package.sh
+./scripts/check.sh    # packages + kpackagetool6 upgrade when available
 
-# Enable the script
+# Enable
 kwriteconfig6 --file kwinrc --group Plugins --key kwin-crosshairEnabled true
 qdbus6 org.kde.KWin /KWin reconfigure
+# After package upgrades in a long session, restart KWin once if re-enable looks stale:
+#   kwin_wayland --replace
 ```
+
+### Method 2: Import `.kwinscript`
+
+1.  Build with `./scripts/package.sh` (artifact: `crosshair.kwinscript`).  
+2.  **System Settings** → **Window Management** → **KWin Scripts** → **Import KWin script…**  
+3.  Enable **Infinite Crosshair** → **Apply**.
+
+### Method 3: KDE Store
+
+Search **Infinite Crosshair** under Get New KWin Scripts when published.
 
 ## ⚙️ Configuration
 
-Once enabled, customize the crosshair to your liking:
+1.  **System Settings** → **Window Management** → **KWin Scripts**.  
+2.  **Infinite Crosshair** → **Configure** (gear).  
+3.  Typical options:  
+    *   **Line color** — color button (default red)  
+    *   **Line width** — pixels  
+    *   **Opacity** — 0.05–1.0  
+    *   **Inch ticks** / diagonal / tick length — optional ruler marks  
+4.  **Apply**. Live updates are picked up from `kwinrc` while the script is running.
 
-1.  Go to **System Settings** > **Window Management** > **KWin Scripts**.  
-2.  Select **Infinite Crosshair** and click the **Configure (⚙️)** button.  
-3.  Adjust the following settings:  
-    *   **Line Color:** Choose any RGB color (Default: `#FF0000` Red).  
-    *   **Line Width:** Set thickness in pixels (Default: `1px`).  
-    *   **Opacity:** Adjust transparency from 0.0 to 1.0 (Default: `0.8`).  
-4.  Click **Apply**. Changes take effect immediately.
+### Known limitation (KDE, not this script)
+
+Each press of **Configure** on any KWin script can open a **new** dialog window (KWin Scripts KCM always `new KCMultiDialog()`). Close extras manually; prefer one click. See `specs/bug-multi-config-dialog.md`.
 
 ## 🛠️ Development & Testing
 
@@ -88,11 +93,18 @@ journalctl --user -u plasma-kwin_x11.service -f
 
 | Issue | Solution |
 |-------|----------|
-| **Lines not visible** | Ensure the script is enabled in System Settings. Check if `z-index` is overridden by another full-screen app. |
-| **Lag or stutter** | Verify you are using the native KWin script (not a Python alternative). Check `journalctl` for QML errors. |
-| **Lines don't span all monitors** | Ensure you are using the latest version which supports virtual desktop geometry. |
-| **Config button missing** | Run: `mkdir -p ~/.local/share/kservices5/ && ln -s ~/.local/share/kwin/scripts/kwin-crosshair/metadata.json ~/.local/share/kservices5/kwin-crosshair.desktop` |
-| **Script crashes KWin** | Disable the script via TTY (`kwriteconfig6 ... --key kwin-crosshairEnabled false`) and check logs for QML syntax errors. |
+| **Lines not visible** | Enable the script in System Settings. Check journal for `InfiniteCrosshair ready build=`. |
+| **Settings / color do nothing** | Confirm `qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.isScriptLoaded kwin-crosshair` is `true`. Apply only writes `kwinrc` if the script is loaded. |
+| **Works after reload.sh, broken after disable/re-enable** | Long session may keep a stale package-path QML body. Run `./scripts/reload.sh` or restart KWin once after upgrades. |
+| **Many Configure windows** | Upstream KWin Scripts KCM (all scripts). Close extras; one gear click. |
+| **Toggle not working** | Default **Meta+Shift+X**. Rebind: System Settings → Keyboard → Shortcuts → search *Infinite Crosshair*. |
+| **Lag or stutter** | Must use native declarative script (this package). No cursor `Timer` polling. Check `journalctl` for QML errors. |
+
+```bash
+# Useful logs
+journalctl --user -b --no-pager | rg InfiniteCrosshair | tail -40
+grep -A20 '\[Script-kwin-crosshair\]' ~/.config/kwinrc
+```
 
 ## 📜 License
 
