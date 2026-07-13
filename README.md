@@ -99,7 +99,8 @@ journalctl --user -u plasma-kwin_x11.service -f
 | **Works after reload.sh, broken after disable/re-enable** | Long session may keep a stale package-path QML body. Run `./scripts/reload.sh` or restart KWin once after upgrades. |
 | **Many Configure windows** | Upstream KWin Scripts KCM (all scripts). Close extras; one gear click. |
 | **Toggle not working** | Default **Meta+Shift+X**. Rebind: System Settings → Keyboard → Shortcuts → search *Infinite Crosshair*. |
-| **Offset guides wrong** | Enable in Configure or **Meta+Shift+V/H**. Set offsets/colors there, or **Meta+Shift+B** over a window near the edge. **Meta+Shift+C** clears. |
+| **Offset guides wrong / vanish on drag** | Keep **Auto-align guides to window borders** checked. Hover a window, then drag — guides should stick for the whole move (`offset5`). Manual: **Meta+Shift+B** / V/H; **Meta+Shift+C** clears. |
+| **Guides gone but main crosshair stays** | Expected if auto lost the target window; mid-drag that was a bug — update to build `offset5`+. |
 | **Lag or stutter** | Must use native declarative script (this package). No cursor `Timer` polling. Check `journalctl` for QML errors. |
 
 ```bash
